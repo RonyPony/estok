@@ -1,0 +1,5 @@
+import { Component, input } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
+import { AppMoney } from './money';
+@Component({selector:'app-stat-card',imports:[MatIconModule,AppMoney],template:'<article class="card stat"><div><span>{{label()}}</span><mat-icon>{{icon()}}</mat-icon></div><strong>@if(money()){<app-money [amount]="value()" />}@else{ {{value()}} }</strong><small>{{caption()}}</small></article>',styles:'.stat{height:100%;padding:22px}.stat>div{display:flex;justify-content:space-between;gap:8px;align-items:center}.stat span{font-size:11px;color:var(--muted);font-weight:600}.stat mat-icon{font-size:18px;width:30px;height:30px;background:var(--brand-soft);border-radius:8px;padding:6px;color:var(--brand)}.stat strong{display:block;font-size:25px;letter-spacing:-1px;margin:15px 0 10px}.stat small{font-size:10px;color:var(--muted)}'})
+export class AppStatCard { readonly label=input.required<string>();readonly value=input(0);readonly icon=input('trending_up');readonly money=input(false);readonly caption=input('Resumen de tu negocio'); }

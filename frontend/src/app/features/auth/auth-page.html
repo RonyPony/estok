@@ -1,0 +1,15 @@
+<span class="eyebrow">EMPIEZA CON CLARIDAD</span>
+<h1>{{ register ? 'Dale espacio a tu negocio' : 'Qué bueno verte de nuevo' }}</h1>
+<p>{{ register ? 'Crea tu cuenta y organiza tu primera venta.' : 'Entra para ver cómo va tu negocio hoy.' }}</p>
+<form [formGroup]="form" (ngSubmit)="submit()">
+  @if (register) {
+    <div class="form-grid"><mat-form-field appearance="outline"><mat-label>Nombre</mat-label><input matInput formControlName="firstName" autocomplete="given-name" /><mat-error>Indica tu nombre</mat-error></mat-form-field><mat-form-field appearance="outline"><mat-label>Apellido</mat-label><input matInput formControlName="lastName" autocomplete="family-name" /><mat-error>Indica tu apellido</mat-error></mat-form-field></div>
+    <mat-form-field appearance="outline"><mat-label>Nombre del negocio</mat-label><input matInput formControlName="businessName" /><mat-error>Indica el nombre del negocio</mat-error></mat-form-field>
+  }
+  <mat-form-field appearance="outline"><mat-label>Correo electrónico</mat-label><input matInput formControlName="email" type="email" autocomplete="email" /><mat-error>Ingresa un correo válido</mat-error></mat-form-field>
+  <mat-form-field appearance="outline"><mat-label>Contraseña</mat-label><input matInput formControlName="password" type="password" [autocomplete]="register ? 'new-password' : 'current-password'" /><mat-error>Usa al menos 10 caracteres</mat-error>@if(register){<mat-hint>Incluye mayúsculas, minúsculas, números y un símbolo.</mat-hint>}</mat-form-field>
+  @if(register){<div class="form-grid"><mat-form-field appearance="outline"><mat-label>País (código)</mat-label><input matInput formControlName="country" maxlength="2" /></mat-form-field><mat-form-field appearance="outline"><mat-label>Moneda</mat-label><input matInput formControlName="currency" maxlength="3" /></mat-form-field></div>}
+  @if(error()){<p class="error" role="alert">{{error()}}</p>}
+  <button mat-flat-button style="width:100%;height:48px;margin:16px 0" [disabled]="loading()">{{ loading() ? 'Un momento…' : register ? 'Crear mi cuenta' : 'Entrar a mi negocio' }}</button>
+</form>
+<p style="text-align:center;font-size:13px">{{ register ? '¿Ya tienes cuenta?' : '¿Tu negocio aún no está aquí?' }} <a [routerLink]="register ? '/login' : '/register'">{{ register ? 'Inicia sesión' : 'Crea tu cuenta' }}</a></p>

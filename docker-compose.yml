@@ -1,0 +1,45 @@
+services:
+  estok-db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SQL_PASSWORD:?Configure SQL_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:1433:1433"
+    volumes:
+      - sql-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+  estok-migrate:
+    build: ./backend
+    command: ["--migrate"]
+    environment:
+      ConnectionStrings__Database: "Server=estok-db;Database=estok;User Id=sa;Password=${SQL_PASSWORD};Encrypt=True;TrustServerCertificate=True"
+      Jwt__Key: ${JWT_KEY:?Configure JWT_KEY in .env}
+    depends_on:
+      estok-db:
+        condition: service_healthy
+  estok-api:
+    build: ./backend
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      ConnectionStrings__Database: "Server=estok-db;Database=estok;User Id=sa;Password=${SQL_PASSWORD};Encrypt=True;TrustServerCertificate=True"
+      Jwt__Key: ${JWT_KEY}
+      AllowedOrigins__0: "http://localhost:${WEB_PORT:-4200}"
+    ports:
+      - "127.0.0.1:${API_PORT:-5080}:8080"
+    depends_on:
+      estok-migrate:
+        condition: service_completed_successfully
+  estok-web:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:${WEB_PORT:-4200}:80"
+    depends_on:
+      - estok-api
+volumes:
+  sql-data:

@@ -1,0 +1,56 @@
+using eStok.Api.Configuration;
+using eStok.Application.Common;
+using eStok.Application.Features.Sales;
+using eStok.Application.Features.Quotes;
+using eStok.Application.Features.Payments;
+using eStok.Application.Features.Settings;
+using eStok.Application.Features.Dashboard;
+using eStok.Application.Abstractions;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+namespace eStok.Api.Controllers;
+[ApiController, Route("api/sales")]
+public sealed class SalesController(SalesService service, IAuthorizationService authorization) : ControllerBase
+{
+    [HttpGet, RequirePermission("sales.view")] public async Task<IActionResult> List([FromQuery] PagedRequest request, CancellationToken ct) => Ok(await service.ListAsync(request, ct));
+    [HttpGet("{id:guid}"), RequirePermission("sales.view")] public async Task<IActionResult> Get(Guid id, CancellationToken ct) => Ok(await service.GetAsync(id, ct));
+    [HttpPost, RequirePermission("sales.create")] public async Task<IActionResult> Create(SaleRequest request, CancellationToken ct)
+    {
+        if (request.Payments is { Count: > 0 } && !(await authorization.AuthorizeAsync(User, "payments.create")).Succeeded) return Forbid();
+        return Ok(await service.CreateAsync(request, ct));
+    }
+    [HttpPost("{id:guid}/cancel"), RequirePermission("sales.cancel")] public async Task<IActionResult> Cancel(Guid id, CancellationToken ct) => Ok(await service.CancelAsync(id, ct));
+}
+[ApiController, Route("api/quotes")]
+public sealed class QuotesController(QuoteService service) : ControllerBase
+{
+    [HttpGet, RequirePermission("quotes.view")] public async Task<IActionResult> List([FromQuery] PagedRequest request, CancellationToken ct) => Ok(await service.ListAsync(request, ct));
+    [HttpGet("{id:guid}"), RequirePermission("quotes.view")] public async Task<IActionResult> Get(Guid id, CancellationToken ct) => Ok(await service.GetAsync(id, ct));
+    [HttpPost, RequirePermission("quotes.create")] public async Task<IActionResult> Create(QuoteRequest request, CancellationToken ct) => Ok(await service.CreateAsync(request, ct));
+    [HttpPut("{id:guid}"), RequirePermission("quotes.edit")] public async Task<IActionResult> Update(Guid id, UpdateQuoteRequest request, CancellationToken ct) => Ok(await service.UpdateAsync(id, request, ct));
+    [HttpPost("{id:guid}/convert-to-sale"), RequirePermission("quotes.convert"), RequirePermission("sales.create")] public async Task<IActionResult> Convert(Guid id, ConvertRequest request, CancellationToken ct) => Ok(await service.ConvertAsync(id, request.WarehouseId, ct));
+}
+public sealed record ConvertRequest(Guid WarehouseId);
+[ApiController, Route("api/payments")]
+public sealed class PaymentsController(PaymentService service) : ControllerBase
+{
+    [HttpPost, RequirePermission("payments.create")] public async Task<IActionResult> Create(PaymentRequest request, CancellationToken ct) => Ok(await service.CreateAsync(request, ct));
+}
+[ApiController, Route("api/settings")]
+public sealed class SettingsController(SettingsService service) : ControllerBase
+{
+    [HttpGet, RequirePermission("settings.view")] public async Task<IActionResult> Get(CancellationToken ct) => Ok(await service.GetAsync(ct));
+    [HttpPut, RequirePermission("settings.manage")] public async Task<IActionResult> Save(SettingsRequest request, CancellationToken ct) => Ok(await service.SaveAsync(request, ct));
+}
+[ApiController, Route("api/dashboard")]
+public sealed class DashboardController(DashboardService service) : ControllerBase
+{
+    [HttpGet, RequirePermission("reports.view")] public async Task<IActionResult> Get(CancellationToken ct) => Ok(await service.GetAsync(ct));
+}
+[ApiController, Route("api/users")]
+public sealed class UsersController(IUserService service) : ControllerBase
+{
+    [HttpGet, RequirePermission("users.view")] public async Task<IActionResult> List(CancellationToken ct) => Ok(await service.ListAsync(ct));
+    [HttpPost, RequirePermission("users.manage")] public async Task<IActionResult> Create(CreateUserRequest request, CancellationToken ct) => Ok(await service.CreateAsync(request, ct));
+    [HttpPut("{id:guid}"), RequirePermission("users.manage")] public async Task<IActionResult> Update(Guid id, UpdateUserRequest request, CancellationToken ct) { await service.UpdateAsync(id, request, ct); return NoContent(); }
+}
