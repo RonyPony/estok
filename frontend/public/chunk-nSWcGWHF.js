@@ -1,0 +1,1 @@
+import{Xt as ce,c as Am,in as g,rr as x}from"./chunk-De5D_45o.js";function w(t){t||(t=g(ce));let i=new x(e=>{if(t.destroyed){e.next();return}return t.onDestroy(e.next.bind(e))});return e=>e.pipe(Am(i))}export{w as t};

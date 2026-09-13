@@ -1,0 +1,7 @@
+# Run Caddy on the same server as the API.
+# Supply a publicly trusted certificate with IP SAN 38.247.133.70.
+# ESTOK_TLS_CERT and ESTOK_TLS_KEY must be absolute certificate/key paths.
+https://38.247.133.70 {
+    tls {$ESTOK_TLS_CERT} {$ESTOK_TLS_KEY}
+    reverse_proxy 127.0.0.1:8096
+}

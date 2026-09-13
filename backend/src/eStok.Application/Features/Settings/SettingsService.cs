@@ -10,7 +10,29 @@ public sealed class SettingsService(IApplicationDbContext db, ICurrentBusiness b
     public async Task<object> GetAsync(CancellationToken ct) => new { Business = await db.Businesses.SingleAsync(x => x.Id == business.BusinessId, ct), Settings = await db.Settings.SingleAsync(x => x.BusinessId == business.BusinessId, ct) };
     public Task<object> SaveAsync(SettingsRequest request, CancellationToken ct) => db.InTransactionAsync<object>(async () =>
     {
-        if (string.IsNullOrWhiteSpace(request.Name) || request.Name.Length > 200 || !System.Text.RegularExpressions.Regex.IsMatch(request.Currency, "^[A-Z]{3}$") || request.Country.Length != 2 || request.QuoteExpirationDays is < 1 or > 365 || request.DefaultTaxRate is < 0 or > 100 || !System.Text.RegularExpressions.Regex.IsMatch(request.InvoicePrefix, "^[A-Z0-9-]{1,10}$") || !System.Text.RegularExpressions.Regex.IsMatch(request.QuotePrefix, "^[A-Z0-9-]{1,10}$")) throw new AppException("INVALID_SETTINGS", "Configuración inválida.");
+        if (string.IsNullOrWhiteSpace(request.Name))
+            throw new AppException("INVALID_NAME", "El nombre es obligatorio.");
+
+        if (request.Name.Length > 200)
+            throw new AppException("INVALID_NAME", "El nombre no puede exceder los 200 caracteres.");
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(request.Currency, "^[A-Z]{3}$"))
+            throw new AppException("INVALID_CURRENCY", "La moneda debe tener exactamente 3 letras mayúsculas, por ejemplo: DOP, USD o EUR.");
+
+        if (request.Country.Length != 2)
+            throw new AppException("INVALID_COUNTRY", "El código de país debe tener exactamente 2 caracteres.");
+
+        if (request.QuoteExpirationDays is < 1 or > 365)
+            throw new AppException("INVALID_QUOTE_EXPIRATION_DAYS", "Los días de expiración de la cotización deben estar entre 1 y 365.");
+
+        if (request.DefaultTaxRate is < 0 or > 100)
+            throw new AppException("INVALID_DEFAULT_TAX_RATE", "La tasa de impuesto predeterminada debe estar entre 0 y 100.");
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(request.InvoicePrefix, "^[A-Z0-9-]{1,10}$"))
+            throw new AppException("INVALID_INVOICE_PREFIX", "El prefijo de factura debe tener entre 1 y 10 caracteres y solo puede contener letras mayúsculas, números y guiones.");
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(request.QuotePrefix, "^[A-Z0-9-]{1,10}$"))
+            throw new AppException("INVALID_QUOTE_PREFIX", "El prefijo de cotización debe tener entre 1 y 10 caracteres y solo puede contener letras mayúsculas, números y guiones.");
         if (!TimeZoneInfo.TryFindSystemTimeZoneById(request.TimeZone, out _)) throw new AppException("INVALID_TIMEZONE", "Zona horaria inválida.");
         var b = await db.Businesses.SingleAsync(x => x.Id == business.BusinessId, ct);
         if (b.Currency != request.Currency && await db.Sales.AnyAsync(x => x.BusinessId == business.BusinessId, ct)) throw AppException.Conflict("No se puede cambiar la moneda cuando existen ventas.");

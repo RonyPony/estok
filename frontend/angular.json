@@ -27,6 +27,7 @@
             "assets": [
               {
                 "glob": "**/*",
+                "ignore": ["**/*.js", "**/*.css", "index.html"],
                 "input": "public"
               }
             ],
