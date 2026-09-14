@@ -20,11 +20,15 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>(); services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();
             services.AddDbContext<AppDbContext>(o => o.UseSqlite(connection));
+            // Program seeds business defaults before the test client is created.
+            using var provider = services.BuildServiceProvider();
+            using var scope = provider.CreateScope();
+            scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated();
         });
     }
     public HttpClient CreateReadyClient()
     {
-        var client = CreateClient();
+        var client = CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = new Uri("https://localhost") });
         using var scope = Services.CreateScope();
         scope.ServiceProvider.GetRequiredService<AppDbContext>().Database.EnsureCreated();
         return client;

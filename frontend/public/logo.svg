@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>eStok — inventario conectado</title>
+  <rect width="64" height="64" rx="17" fill="#1A6B52"/>
+  <path d="M44 18H25a9 9 0 0 0-9 9v10a9 9 0 0 0 9 9h19v-8H26a2 2 0 0 1-2-2v-1h18v-7H24v-1a2 2 0 0 1 2-2h18v-7Z" fill="#FAFBF8"/>
+  <rect x="47" y="18" width="7" height="7" rx="2" fill="#C5E69A"/>
+</svg>

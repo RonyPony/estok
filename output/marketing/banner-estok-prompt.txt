@@ -1,0 +1,15 @@
+Generado con ImageGen integrado.
+
+Use case: ads-marketing. Create ONE polished Spanish social media advertising banner for eStok, a small-business inventory and sales web application. Square composition, high resolution. Premium approachable editorial design, excellent mobile legibility. Brand colors forest green #1a6b52, deep ink #192e2b, pale mint #e8f3ed, warm white. Generous margins and clean typography. Audience: entrepreneurs, independent sellers, small shops organizing products, inventory and sales.
+Exact advertising copy:
+Brand at top: "eStok"
+Small eyebrow: "PARA EMPRENDEDORES"
+Large dominant headline on two or three lines: "Tu negocio, en orden."
+Subheadline: "Productos, inventario y ventas en un solo lugar."
+Three concise feature rows with refined simple icons:
+"Organiza productos y existencias"
+"Registra ventas y cotizaciones"
+"Gestiona clientes, pagos y cuentas por cobrar"
+Bottom CTA: "Empieza a organizar tu negocio"
+Website very prominent and perfectly legible at bottom: "estokrd.web.app"
+Design: strong typography on left and upper area, beautiful dimensional arrangement of small cardboard product boxes and a laptop on right/lower middle representing an entrepreneur's organized business. The laptop has a restrained illustrative green and white dashboard with simple product tiles and chart shapes, no fabricated metrics or tiny gibberish. Clearly subordinate to headline and feature list. Sophisticated soft studio shadows, subtle green curves or background fields, crisp professional ad composition, not crowded. Website in a high-contrast footer bar, all copy safely inside margins. No claims of free access, no invented prices, no testimonials, no QR, no extra features. Render Spanish accents and all specified text correctly.

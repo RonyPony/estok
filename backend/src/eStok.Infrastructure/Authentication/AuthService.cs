@@ -25,23 +25,24 @@ public sealed class AuthService(AppDbContext db, UserManager<ApplicationUser> us
     IDateTimeProvider clock, IOptions<JwtOptions> options, ICurrentUser currentUser, ICurrentBusiness currentBusiness) : IAuthService
 {
     private static AppException Unauthorized() => new("INVALID_CREDENTIALS", "Credenciales o sesión inválidas.", 401);
+    private static AppException InactiveAccount() => new("ACCOUNT_INACTIVE", "Tu cuenta o negocio aún no están activos. Revisaremos tu información y nos pondremos en contacto contigo para activar tu cuenta. Podrás iniciar sesión cuando se complete la activación.", 403);
     private static string Hash(string token) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
 
-    public async Task<SessionResponse> RegisterAsync(RegisterRequest request, CancellationToken ct)
+    public async Task<RegistrationResponse> RegisterAsync(RegisterRequest request, CancellationToken ct)
     {
         db.IsInitializing = true;
         try
         {
             return await db.InTransactionAsync(async () =>
             {
-                var user = new ApplicationUser { UserName = request.Email.Trim(), Email = request.Email.Trim(), FirstName = request.FirstName.Trim(), LastName = request.LastName.Trim(), CreatedAt = clock.UtcNow };
+                var user = new ApplicationUser { UserName = request.Email.Trim(), Email = request.Email.Trim(), FirstName = request.FirstName.Trim(), LastName = request.LastName.Trim(), CreatedAt = clock.UtcNow, IsActive = false };
                 var result = await users.CreateAsync(user, request.Password);
                 if (!result.Succeeded) throw new AppException("REGISTRATION_FAILED", string.Join(" ", result.Errors.Select(e => e.Description)));
-                var business = new Business { Name = request.BusinessName.Trim(), Country = request.Country.ToUpperInvariant(), Currency = request.Currency.ToUpperInvariant() };
+                var business = new Business { Name = request.BusinessName.Trim(), Country = request.Country.ToUpperInvariant(), Currency = request.Currency.ToUpperInvariant(), IsActive = false };
                 db.Businesses.Add(business);
                 await db.SaveChangesAsync(ct);
                 await initializer.InitializeAsync(business.Id, user.Id, business.Currency, ct);
-                return await IssueAsync(user, business.Id, ct);
+                return new RegistrationResponse("pending_review", "Recibimos tu información y la de tu negocio. Tu cuenta está inactiva mientras revisamos los datos. Nos pondremos en contacto contigo al correo registrado para activar tu cuenta. Podrás iniciar sesión cuando se complete la activación.");
             }, ct);
         }
         finally { db.IsInitializing = false; }
@@ -50,10 +51,15 @@ public sealed class AuthService(AppDbContext db, UserManager<ApplicationUser> us
     public async Task<SessionResponse> LoginAsync(LoginRequest request, CancellationToken ct)
     {
         var user = await users.FindByEmailAsync(request.Email.Trim());
-        if (user is null || !user.IsActive || await users.IsLockedOutAsync(user)) throw Unauthorized();
+        if (user is null || await users.IsLockedOutAsync(user)) throw Unauthorized();
         if (!await users.CheckPasswordAsync(user, request.Password)) { await users.AccessFailedAsync(user); throw Unauthorized(); }
         await users.ResetAccessFailedCountAsync(user);
-        var membership = await db.BusinessUsers.IgnoreQueryFilters().Where(x => x.UserId == user.Id && x.IsActive).OrderBy(x => x.CreatedAt).FirstOrDefaultAsync(ct) ?? throw Unauthorized();
+        if (!user.IsActive) throw InactiveAccount();
+        var membership = await (from member in db.BusinessUsers.IgnoreQueryFilters()
+                                join business in db.Businesses on member.BusinessId equals business.Id
+                                where member.UserId == user.Id && member.IsActive && business.IsActive
+                                orderby member.CreatedAt
+                                select member).FirstOrDefaultAsync(ct) ?? throw InactiveAccount();
         var response = await IssueAsync(user, membership.BusinessId, ct);
         await db.SaveChangesAsync(ct);
         return response;
@@ -81,6 +87,7 @@ public sealed class AuthService(AppDbContext db, UserManager<ApplicationUser> us
     public async Task<object> MeAsync(CancellationToken ct)
     {
         var user = await users.FindByIdAsync(currentUser.UserId.ToString()) ?? throw Unauthorized();
+        if (!user.IsActive) throw Unauthorized();
         var (business, _, permissions) = await MembershipAsync(user.Id, currentBusiness.BusinessId, ct);
         return new { User = new SessionUser(user.Id, user.FirstName, user.LastName, user.Email!), Business = business, Permissions = permissions };
     }
@@ -96,6 +103,7 @@ public sealed class AuthService(AppDbContext db, UserManager<ApplicationUser> us
 
     private async Task<SessionResponse> IssueAsync(ApplicationUser user, Guid businessId, CancellationToken ct)
     {
+        if (!user.IsActive) throw Unauthorized();
         var (business, role, permissions) = await MembershipAsync(user.Id, businessId, ct);
         var jwt = options.Value;
         Claim[] claims = [new("sub", user.Id.ToString()), new("email", user.Email!), new("business_id", businessId.ToString()), new("business_role", role), new("jti", Guid.NewGuid().ToString())];

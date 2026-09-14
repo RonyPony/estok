@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { environment } from '../../../environments/environment';
-import { LoginRequest, RegisterRequest, Session } from '../models/session';
+import { LoginRequest, RegisterRequest, RegistrationResponse, Session } from '../models/session';
 @Injectable({ providedIn: 'root' })
 export class AuthApiService {
   private readonly http = inject(HttpClient);
@@ -11,7 +11,7 @@ export class AuthApiService {
     });
   }
   register(request: RegisterRequest) {
-    return this.http.post<Session>(`${environment.apiBaseUrl}/auth/register`, request, {
+    return this.http.post<RegistrationResponse>(`${environment.apiBaseUrl}/auth/register`, request, {
       withCredentials: true,
     });
   }

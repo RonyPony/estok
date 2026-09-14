@@ -9,7 +9,7 @@ namespace eStok.Api.Controllers;
 public sealed class AuthController(IAuthService auth, IValidator<RegisterRequest> validator, IConfiguration config) : ControllerBase
 {
     [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct) { await validator.ValidateAndThrowAsync(request, ct); return Session(await auth.RegisterAsync(request, ct)); }
+    public async Task<IActionResult> Register(RegisterRequest request, CancellationToken ct) { await validator.ValidateAndThrowAsync(request, ct); return Ok(await auth.RegisterAsync(request, ct)); }
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
     {

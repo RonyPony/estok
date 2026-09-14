@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { AuthService } from './auth.service';
 import { AuthStateService } from './auth-state.service';
 import { Session } from '../models/session';
+import { environment } from '../../../environments/environment';
 
 describe('AuthService refresh coordination', () => {
   let http: HttpTestingController;
@@ -16,19 +17,19 @@ describe('AuthService refresh coordination', () => {
     const received: Session[] = [];
     auth.refresh().subscribe(value => received.push(value));
     auth.refresh().subscribe(value => received.push(value));
-    const request = http.expectOne('/api/auth/refresh');
+    const request = http.expectOne(`${environment.apiBaseUrl}/auth/refresh`);
     expect(request.request.withCredentials).toBe(true);
     request.flush(session);
     expect(received).toEqual([session, session]);
     expect(TestBed.inject(AuthStateService).session()).toEqual(session);
     auth.refresh().subscribe();
-    http.expectOne('/api/auth/refresh').flush(session);
+    http.expectOne(`${environment.apiBaseUrl}/auth/refresh`).flush(session);
   });
   it('clears authentication after refresh rejection', () => {
     TestBed.inject(AuthStateService).session.set(session);
     let rejected = false;
     auth.refresh().subscribe({ error: () => rejected = true });
-    http.expectOne('/api/auth/refresh').flush({}, { status: 401, statusText: 'Unauthorized' });
+    http.expectOne(`${environment.apiBaseUrl}/auth/refresh`).flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(rejected).toBe(true);
     expect(TestBed.inject(AuthStateService).session()).toBeNull();
   });

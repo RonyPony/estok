@@ -17,7 +17,7 @@ public sealed class BusinessInitializer(AppDbContext db) : IBusinessInitializer
             db.Roles.Add(role);
             foreach (var p in permissions.Where(p => PermissionCodes.ForRole(name).Contains(p.Code)))
                 db.RolePermissions.Add(new RolePermission { BusinessId = businessId, RoleId = role.Id, PermissionId = p.Id });
-            if (name == "Owner") db.BusinessUsers.Add(new BusinessUser { BusinessId = businessId, UserId = userId, RoleId = role.Id, IsOwner = true });
+            if (name == "Owner") db.BusinessUsers.Add(new BusinessUser { BusinessId = businessId, UserId = userId, RoleId = role.Id, IsOwner = true, IsActive = false });
         }
         db.Settings.Add(new BusinessSettings { BusinessId = businessId, Currency = currency, CurrencySymbol = currency == "DOP" ? "RD$" : currency });
         db.Warehouses.Add(new Warehouse { BusinessId = businessId, Name = "Almacén Principal", IsDefault = true });

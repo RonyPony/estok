@@ -1,13 +1,13 @@
 <header class="navigation">
   <a class="brand" routerLink="/" aria-label="eStok, inicio"><img [src]="brand.applicationLogo" alt="" />{{brand.applicationName}}</a>
-  <nav aria-label="Navegación principal"><a class="login" routerLink="/login">Iniciar sesión</a><a class="button" routerLink="/register">Crear cuenta <span aria-hidden="true">↗</span></a></nav>
+  <nav aria-label="Navegación principal"><a class="login" [href]="loginUrl">Iniciar sesión</a><a class="button" [href]="registerUrl">Crear cuenta <span aria-hidden="true">↗</span></a></nav>
 </header>
 <main>
   <section class="hero">
     <div class="intro"><span class="eyebrow">UN NEGOCIO EN ORDEN. UN DÍA MÁS SIMPLE.</span>
       <h1>Tu negocio crece.<br /><em>Tu control también.</em></h1>
       <p>Del primer producto a la próxima venta. Organiza tu inventario, conoce a tus clientes y lleva tus cobros en un solo lugar.</p>
-      <div class="actions"><a class="button" routerLink="/register">Empezar con mi negocio <span aria-hidden="true">→</span></a><a class="secondary" routerLink="/login">Ya tengo una cuenta</a></div>
+      <div class="actions"><a class="button" [href]="registerUrl">Empezar con mi negocio <span aria-hidden="true">→</span></a><a class="secondary" [href]="loginUrl">Ya tengo una cuenta</a></div>
       <div class="note"><span aria-hidden="true">✓</span> Más claridad para decidir. Más espacio para crecer.</div>
     </div>
     <div class="preview" aria-label="Vista ilustrativa de las funciones de eStok">
@@ -23,6 +23,6 @@
     <article><span class="number">02 / VENTAS</span><h3>De la idea a la venta</h3><p>Prepara cotizaciones, conviértelas en ventas y mantén la información de tus clientes a mano.</p></article>
     <article><span class="number">03 / COBROS</span><h3>Cuentas más claras</h3><p>Registra pagos y consulta las cuentas por cobrar para dar seguimiento a lo pendiente.</p></article>
   </section>
-  <section class="closing"><div><h2>Tu próximo paso empieza aquí.</h2><p>Crea tu cuenta y dale un lugar a tu negocio.</p></div><a class="button" routerLink="/register">Crear mi cuenta <span aria-hidden="true">→</span></a></section>
+  <section class="closing"><div><h2>Tu próximo paso empieza aquí.</h2><p>Crea tu cuenta y dale un lugar a tu negocio.</p></div><a class="button" [href]="registerUrl">Crear mi cuenta <span aria-hidden="true">→</span></a></section>
 </main>
-<footer><strong>{{brand.applicationName}}</strong><span>El espacio para hacer crecer tus ideas.</span><a routerLink="/login">Iniciar sesión</a></footer>
+<footer><strong>{{brand.applicationName}}</strong><span>El espacio para hacer crecer tus ideas.</span><a [href]="loginUrl">Iniciar sesión</a></footer>

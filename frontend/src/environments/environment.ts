@@ -1,2 +1,5 @@
-// HTTPS gateway on port 443; the backend remains internal on port 8096.
-export const environment = { apiBaseUrl: 'https://38.247.133.70:8096/api' };
+export const environment = {
+  apiBaseUrl: 'http://38.247.133.70:8096/api',
+  // Destination of the landing page's login and registration links.
+  siteBaseUrl: 'http://38.247.133.70:8097',
+};

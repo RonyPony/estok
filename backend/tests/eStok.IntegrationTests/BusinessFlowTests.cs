@@ -12,9 +12,11 @@ public sealed class BusinessFlowTests
         Assert.True(response.IsSuccessStatusCode, $"{path}: {response.StatusCode} {text}");
         return JsonDocument.Parse(text).RootElement.Clone();
     }
-    private static async Task RegisterAsync(HttpClient client, string email)
+    private static async Task RegisterAsync(ApiFactory factory, HttpClient client, string email)
     {
-        var session = await PostAsync(client, "/api/auth/register", new { firstName = "Test", lastName = "Owner", email, password = "StrongPassword123!", businessName = email, country = "DO", currency = "DOP" });
+        await PostAsync(client, "/api/auth/register", new { firstName = "Test", lastName = "Owner", email, password = "StrongPassword123!", businessName = email, country = "DO", currency = "DOP" });
+        await RegistrationTests.SetActivationAsync(factory, email, true, true, true);
+        var session = await PostAsync(client, "/api/auth/login", new { email, password = "StrongPassword123!" });
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", session.GetProperty("accessToken").GetString());
     }
     [Fact]
@@ -22,7 +24,7 @@ public sealed class BusinessFlowTests
     {
         using var factory = new ApiFactory(); using var a = factory.CreateReadyClient(); using var b = factory.CreateClient();
         Assert.Equal(HttpStatusCode.Unauthorized, (await a.GetAsync("/api/products")).StatusCode);
-        await RegisterAsync(a, "a@example.com"); await RegisterAsync(b, "b@example.com");
+        await RegisterAsync(factory, a, "a@example.com"); await RegisterAsync(factory, b, "b@example.com");
         var customer = await PostAsync(a, "/api/customers", new { code = "C1", firstName = "Ana" }); var customerId = customer.GetProperty("id").GetGuid();
         var product = await PostAsync(a, "/api/products", new { sku = "SKU1", name = "Café", cost = 5, salePrice = 10 }); var productId = product.GetProperty("id").GetGuid();
         await PostAsync(b, "/api/products", new { sku = "SKU1", name = "Otro café", cost = 5, salePrice = 10 });
