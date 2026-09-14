@@ -4,6 +4,8 @@ Base de un SaaS multiempresa para pequeños negocios. Monolito modular con API .
 
 ## Arquitectura
 
+El backoffice administrativo independiente está en `backoffice/`. Consulta [su guía de arranque y configuración](backoffice/README.md) y [el análisis de backend y frontend](backoffice/ANALISIS.md). Incluye cuentas, negocios, activaciones, papelera, actividad, auditoría global y mantenimiento de sesiones con conteos de tablas.
+
 ```text
 backend/
   eStok.sln

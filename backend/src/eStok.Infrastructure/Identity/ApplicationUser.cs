@@ -7,6 +7,7 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public DateTime? LastActivityAt { get; set; }
 }
 public sealed class RefreshToken
 {

@@ -36,11 +36,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<DocumentSequence> Sequences => Set<DocumentSequence>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<PlatformAuditLog> PlatformAuditLogs => Set<PlatformAuditLog>();
 
     protected override void OnModelCreating(ModelBuilder model)
     {
         base.OnModelCreating(model);
         model.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        model.Entity<PlatformAuditLog>().HasIndex(x => new { x.CreatedAt, x.UserId });
+        model.Entity<ApplicationUser>().HasIndex(x => x.LastActivityAt);
         foreach (var type in model.Model.GetEntityTypes().Where(t => typeof(TenantEntity).IsAssignableFrom(t.ClrType)))
         {
             var p = Expression.Parameter(type.ClrType, "entity");
@@ -65,6 +68,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
         var changes = ChangeTracker.Entries<Entity>().Where(e => e.State is EntityState.Added or EntityState.Modified or EntityState.Deleted).ToList();
         foreach (var entry in changes)
         {
+            if (entry.Entity is PlatformAuditLog && entry.State != EntityState.Added)
+                throw AppException.Conflict("El registro de auditoría es inmutable.");
             if (entry.Entity is TenantEntity tenant)
             {
                 if (!IsInitializing && entry.State != EntityState.Added)
@@ -85,13 +90,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
                     soft.IsDeleted = true; soft.DeletedAt = clock.UtcNow; soft.DeletedBy = user.UserId;
                 }
                 if (entry.Entity is not AuditLog && !IsInitializing)
-                    AuditLogs.Add(new AuditLog { BusinessId = tenant.BusinessId, UserId = user.UserId, EntityName = entry.Entity.GetType().Name, EntityId = tenant.Id.ToString(), Action = entry.State.ToString(), CreatedAt = clock.UtcNow });
+                    AuditLogs.Add(new AuditLog { BusinessId = tenant.BusinessId, UserId = user.UserId, EntityName = entry.Entity.GetType().Name, EntityId = tenant.Id.ToString(), Action = entry.Entity is SoftDeletableEntity deleted && deleted.IsDeleted && !entry.Property(nameof(SoftDeletableEntity.IsDeleted)).OriginalValue!.Equals(true) ? "SoftDeleted" : entry.State.ToString(), CreatedAt = clock.UtcNow });
             }
             if (entry.State == EntityState.Added) entry.Entity.CreatedAt = clock.UtcNow;
             else entry.Entity.UpdatedAt = clock.UtcNow;
         }
         return await base.SaveChangesAsync(cancellationToken);
     }
+
+    // Used only by the explicitly authorized platform administration service. It does
+    // not alter tenant guards for the normal application DbContext interface.
+    internal Task<int> SavePlatformChangesAsync(CancellationToken ct) => base.SaveChangesAsync(ct);
 
     public async Task<T> InTransactionAsync<T>(Func<Task<T>> action, CancellationToken ct)
     {

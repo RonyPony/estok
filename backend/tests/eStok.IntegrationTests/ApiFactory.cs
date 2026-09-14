@@ -8,7 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace eStok.IntegrationTests;
-public sealed class ApiFactory : WebApplicationFactory<Program>
+public sealed class ApiFactory(Dictionary<string, string?>? extraSettings = null) : WebApplicationFactory<Program>
 {
     private readonly SqliteConnection connection = new("Data Source=:memory:");
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -16,6 +16,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>
         connection.Open();
         builder.UseEnvironment("Testing");
         builder.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(new Dictionary<string, string?> { ["Jwt:Key"] = "test-only-signing-key-that-is-at-least-32-bytes-long" }));
+        if (extraSettings != null) builder.ConfigureAppConfiguration((_, c) => c.AddInMemoryCollection(extraSettings));
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DbContextOptions<AppDbContext>>(); services.RemoveAll<IDbContextOptionsConfiguration<AppDbContext>>();

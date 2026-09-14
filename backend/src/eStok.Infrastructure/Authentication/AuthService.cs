@@ -61,6 +61,8 @@ public sealed class AuthService(AppDbContext db, UserManager<ApplicationUser> us
                                 orderby member.CreatedAt
                                 select member).FirstOrDefaultAsync(ct) ?? throw InactiveAccount();
         var response = await IssueAsync(user, membership.BusinessId, ct);
+        user.LastActivityAt = clock.UtcNow;
+        db.PlatformAuditLogs.Add(new PlatformAuditLog { UserId = user.Id, BusinessId = membership.BusinessId, EntityName = "ApplicationUser", EntityId = user.Id.ToString(), Action = "login", Reason = "Inicio de sesión en el negocio.", CreatedAt = clock.UtcNow });
         await db.SaveChangesAsync(ct);
         return response;
     }

@@ -13,6 +13,11 @@ public static class ApiExtensions
         services.AddEndpointsApiExplorer(); services.AddSwaggerGen(); services.AddHttpContextAccessor();
         services.AddScoped<CurrentContext>(); services.AddScoped<ICurrentUser>(s => s.GetRequiredService<CurrentContext>()); services.AddScoped<ICurrentBusiness>(s => s.GetRequiredService<CurrentContext>());
         services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        services.AddScoped<IAuthorizationHandler, BackofficeAuthorizationHandler>();
+        services.AddScoped<eStok.Infrastructure.Administration.BackofficeService>();
+        services.AddOptions<BackofficeOptions>().Bind(config.GetSection("Backoffice"))
+            .Validate(x => x.SessionMinutes is >= 5 and <= 60 && x.ActivityWindowMinutes is >= 1 and <= 1440 && x.SessionRetentionDays is >= 30 and <= 3650, "Invalid backoffice limits.").ValidateOnStart();
+        services.AddAuthorization(o => o.AddPolicy("Backoffice", p => p.RequireAuthenticatedUser().AddRequirements(new BackofficeRequirement())));
         services.AddAuthorization(o => { foreach (var code in PermissionCodes.All) o.AddPolicy(code, p => p.RequireAuthenticatedUser().AddRequirements(new PermissionRequirement(code))); });
         services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(config.GetSection("AllowedOrigins").Get<string[]>() ?? ["http://localhost:4200"]).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
         services.AddRateLimiter(o => { o.RejectionStatusCode = 429; o.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(context.Connection.RemoteIpAddress?.ToString() ?? "unknown", _ => new FixedWindowRateLimiterOptions { PermitLimit = 20, Window = TimeSpan.FromMinutes(1) })); });
@@ -21,6 +26,7 @@ public static class ApiExtensions
     public static WebApplication UseApiMiddlewares(this WebApplication app)
     {
         app.UseMiddleware<ErrorMiddleware>(); app.UseCors(); app.UseRateLimiter(); app.UseAuthentication(); app.UseAuthorization();
+        app.UseMiddleware<UserActivityMiddleware>();
         if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
         app.MapControllers(); return app;
     }
