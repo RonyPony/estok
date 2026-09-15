@@ -25,6 +25,27 @@ describe('Registration review flow', () => {
   });
   afterEach(() => http.verify());
 
+  it.each([false, true])('toggles password visibility without submitting (register=%s)', (register) => {
+    route.snapshot.data.register = register;
+    const fixture = TestBed.createComponent(AuthPageComponent);
+    fixture.componentInstance.form.patchValue(request);
+    fixture.detectChanges();
+    const element: HTMLElement = fixture.nativeElement;
+    const input = element.querySelector<HTMLInputElement>('input[formControlName="password"]')!;
+    const toggle = element.querySelector<HTMLButtonElement>('button[aria-label="Mostrar contraseña"]')!;
+    expect(input.type).toBe('password');
+    expect(toggle.type).toBe('button');
+    toggle.click();
+    fixture.detectChanges();
+    expect(input.type).toBe('text');
+    expect(toggle.getAttribute('aria-label')).toBe('Ocultar contraseña');
+    toggle.click();
+    fixture.detectChanges();
+    expect(input.type).toBe('password');
+    expect(input.value).toBe(request.password);
+    http.expectNone(() => true);
+  });
+
   it('shows the pending review confirmation without creating a session or navigating to the dashboard', () => {
     const fixture = TestBed.createComponent(AuthPageComponent);
     const component = fixture.componentInstance;

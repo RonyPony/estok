@@ -6,6 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatIconModule } from '@angular/material/icon';
 import { finalize } from 'rxjs';
 import { AuthApiService } from '../../core/auth/auth-api.service';
 import { AuthStateService } from '../../core/auth/auth-state.service';
@@ -18,6 +19,7 @@ import { AuthStateService } from '../../core/auth/auth-state.service';
     MatInputModule,
     MatButtonModule,
     MatCheckboxModule,
+    MatIconModule,
   ],
   templateUrl: './auth-page.html',
 })
@@ -27,6 +29,7 @@ export class AuthPageComponent {
   private readonly state = inject(AuthStateService);
   private readonly router = inject(Router);
   readonly loading = signal(false);
+  readonly passwordVisible = signal(false);
   readonly error = signal('');
   readonly registrationMessage = signal('');
   readonly form = inject(FormBuilder).nonNullable.group({

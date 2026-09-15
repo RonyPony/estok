@@ -11,7 +11,7 @@ export const authInterceptor: HttpInterceptorFn = (request, next) => {
   const token = state.session()?.accessToken;
   const authorized = token ? request.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : request;
   return next(authorized).pipe(catchError((error: unknown) => {
-    if (!(error instanceof HttpErrorResponse) || error.status !== 401) return throwError(() => error);
+    if (!token || !(error instanceof HttpErrorResponse) || error.status !== 401) return throwError(() => error);
     return auth.refresh().pipe(catchError(refreshError => { void router.navigateByUrl('/login'); return throwError(() => refreshError); }), switchMap(session => next(request.clone({ setHeaders: { Authorization: `Bearer ${session.accessToken}` } }))));
   }));
 };

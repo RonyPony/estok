@@ -23,7 +23,11 @@
   <mat-form-field appearance="outline"><mat-label>Correo electrónico</mat-label><input matInput formControlName="email"
       type="email" autocomplete="email" /><mat-error>Ingresa un correo válido</mat-error></mat-form-field>
   <mat-form-field appearance="outline"><mat-label>Contraseña</mat-label><input matInput formControlName="password"
-      type="password" [autocomplete]="register ? 'new-password' : 'current-password'" /><mat-error>{{ register ? 'Usa entre 10 y 128 caracteres' : 'Indica tu contraseña' }}</mat-error>@if(register){<mat-hint>Incluye mayúsculas, minúsculas, números y un
+      [type]="passwordVisible() ? 'text' : 'password'" [autocomplete]="register ? 'new-password' : 'current-password'" />
+    <button mat-icon-button matSuffix type="button" (click)="passwordVisible.set(!passwordVisible())"
+      [attr.aria-label]="passwordVisible() ? 'Ocultar contraseña' : 'Mostrar contraseña'" [attr.aria-pressed]="passwordVisible()">
+      <mat-icon>{{ passwordVisible() ? 'visibility_off' : 'visibility' }}</mat-icon>
+    </button><mat-error>{{ register ? 'Usa entre 10 y 128 caracteres' : 'Indica tu contraseña' }}</mat-error>@if(register){<mat-hint>Incluye mayúsculas, minúsculas, números y un
       símbolo.</mat-hint>}</mat-form-field>
   @if(register){<div class="form-grid"><mat-form-field appearance="outline"><mat-label>País (código)</mat-label><input
         matInput formControlName="country" maxlength="2" /></mat-form-field><mat-form-field
