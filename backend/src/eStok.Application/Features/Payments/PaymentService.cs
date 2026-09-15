@@ -15,8 +15,8 @@ public sealed class PaymentService(IApplicationDbContext db, ICurrentBusiness bu
         var payment = new Payment { BusinessId = business.BusinessId, SaleId = sale.Id, CustomerId = sale.CustomerId, PaymentMethodId = request.PaymentMethodId, Amount = request.Amount, Reference = request.Reference, Notes = request.Notes, PaymentDate = clock.UtcNow, CreatedBy = user.UserId };
         db.Payments.Add(payment);
         sale.PaidAmount += request.Amount; sale.Balance -= request.Amount; sale.PaymentStatus = sale.Balance == 0 ? PaymentStatus.Paid : PaymentStatus.Partial;
-        var debt = await db.Receivables.SingleAsync(x => x.SaleId == sale.Id && x.BusinessId == business.BusinessId, ct);
-        debt.Balance = sale.Balance; debt.Status = sale.Balance == 0 ? ReceivableStatus.Paid : ReceivableStatus.Partial;
+        var debt = await db.Receivables.SingleOrDefaultAsync(x => x.SaleId == sale.Id && x.BusinessId == business.BusinessId, ct);
+        if (debt is not null) { debt.Balance = sale.Balance; debt.Status = sale.Balance == 0 ? ReceivableStatus.Paid : ReceivableStatus.Partial; }
         return payment;
     }, ct);
 }

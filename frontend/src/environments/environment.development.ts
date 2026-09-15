@@ -1,4 +1,4 @@
 export const environment = {
-  apiBaseUrl: 'http://38.247.133.70:8096/api',
-  siteBaseUrl: 'http://38.247.133.70:8097',
+  apiBaseUrl: 'http://localhost:5000/api',
+  siteBaseUrl: 'http://localhost:4200',
 };

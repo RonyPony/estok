@@ -24,6 +24,7 @@ public static class DependencyInjection
             o.MapInboundClaims = false;
             o.TokenValidationParameters = new TokenValidationParameters { ValidateIssuer = true, ValidateAudience = true, ValidateLifetime = true, ValidateIssuerSigningKey = true, ValidIssuer = jwt.Value.Issuer, ValidAudience = jwt.Value.Audience, IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Value.Key)), ClockSkew = TimeSpan.FromSeconds(15) };
         });
+        services.AddScoped<IDocumentService, eStok.Infrastructure.Documents.DocumentService>();
         services.AddScoped<IAuthService, AuthService>(); services.AddScoped<IBusinessInitializer, BusinessInitializer>(); services.AddSingleton<IDateTimeProvider, DateTimeProvider>();
         services.AddScoped<IUserService, UserService>(); return services;
     }

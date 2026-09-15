@@ -10,6 +10,8 @@ public sealed class Business : Entity
     public string? Email { get; set; }
     public string? Address { get; set; }
     public string? LogoUrl { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public byte[]? LogoContent { get; set; }
     public string Currency { get; set; } = "DOP";
     public string Country { get; set; } = "DO";
     public string TimeZone { get; set; } = "America/Santo_Domingo";

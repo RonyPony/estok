@@ -1,6 +1,6 @@
 @use '@angular/material' as mat;
-html { @include mat.theme((color: (primary: mat.$green-palette, tertiary: mat.$cyan-palette), typography: Inter, density: 0)); }
-:root { --brand: #1a6b52; --brand-soft: #e8f3ed; --ink: #192e2b; --muted: #697b75; --surface: #ffffff; --canvas: #f5f7f5; --border: #e3e9e5; --danger: #b33e3e; --radius: 16px; }
+html { @include mat.theme((color: (primary: mat.$azure-palette, tertiary: mat.$violet-palette), typography: Inter, density: 0)); }
+:root { --brand: #3659d9; --brand-soft: #edf1ff; --ink: #17243b; --muted: #62718a; --surface: #ffffff; --canvas: #f3f5fa; --border: #dfe5ef; --danger: #b33e3e; --radius: 16px; }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: Inter, 'Segoe UI', sans-serif; background: var(--canvas); color: var(--ink); }
 a { color: var(--brand); text-decoration: none; }
@@ -20,3 +20,27 @@ p { color: var(--muted); line-height: 1.6; }
 .table-scroll { overflow: auto; } table { width: 100%; border-collapse: collapse; } th { text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .8px; background: var(--canvas); } th, td { padding: 15px 16px; border-bottom: 1px solid var(--border); white-space: nowrap; } td { font-size: 13px; } tr:last-child td { border-bottom: 0; }
 @media(max-width: 700px) { .page-heading { align-items: flex-start; flex-direction: column; } .form-grid { grid-template-columns: 1fr; } .card { padding: 18px; } }
 :root { --mat-sys-primary: var(--brand); --mat-sys-on-primary: white; --mat-sys-primary-container: var(--brand-soft); --mat-sys-on-primary-container: var(--brand); }
+
+body { background: radial-gradient(ellipse at 95% 0%, #e6ebff 0, transparent 42%), var(--canvas); }
+.card { box-shadow: 0 4px 24px #1c315908; }
+.page-heading h1 { font-weight: 750; }
+.page-heading { margin-bottom: 30px; }
+.page-heading p { max-width: 660px; }
+.mdc-button { letter-spacing: .1px; }
+.mat-mdc-unelevated-button { box-shadow: 0 4px 10px #3659d925; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid #8ca2f0; outline-offset: 3px; }
+tbody tr:hover { background: #f7f9ff; }
+th { background: #eef2f9; padding-top: 17px; padding-bottom: 17px; }
+.form-actions { flex-wrap: wrap; padding-top: 20px; border-top: 1px solid var(--border); }
+.section-divider { height: 1px; background: var(--border); margin: 28px 0; }
+.info-panel { padding: 14px 18px; background: var(--brand-soft); border-left: 3px solid var(--brand); border-radius: 8px; color: #314676; }
+.product-entry { display: flex; align-items: center; gap: 20px; padding: 20px; border: 1px solid #cbd6fa; border-radius: 12px; background: #f7f9ff; margin-bottom: 20px; }
+.product-entry>div { flex: 1; } .product-entry p { margin: 5px 0 0; font-size: 12px; }
+.product-entry mat-form-field { width: 140px; flex-shrink: 0; }
+.field-help { font-size: 12px; margin: 15px 0; }
+.table-scroll input { min-height: 38px; padding: 8px 10px; border: 1px solid #c4cee0; border-radius: 7px; background: #f8faff; color: var(--ink); font: inherit; }
+.logo-upload { display: flex; align-items: center; gap: 24px; padding: 22px; margin: 0 0 28px; border: 1px dashed #b4c2e5; background: #f7f9ff; border-radius: 12px; }
+.logo-upload img { max-width: 180px; height: 80px; object-fit: contain; }
+.logo-upload label { display: grid; gap: 12px; font-size: 13px; color: var(--muted); }
+.logo-upload input { max-width: 100%; }
+@media(max-width:700px) { .product-entry,.logo-upload { flex-direction: column; align-items: stretch; } .product-entry mat-form-field { width: 100%; } .form-actions { justify-content: stretch; } }

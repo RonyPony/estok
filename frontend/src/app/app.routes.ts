@@ -1,9 +1,9 @@
 import { Routes } from '@angular/router';
-import { authGuard, permissionGuard } from './core/guards/auth.guard';
+import { authGuard, guestGuard, permissionGuard } from './core/guards/auth.guard';
 export const routes: Routes = [
- {path:'',pathMatch:'full',loadComponent:()=>import('./features/landing/landing-page').then(m=>m.LandingPageComponent)},
+ {path:'',pathMatch:'full',canActivate:[guestGuard],loadComponent:()=>import('./features/landing/landing-page').then(m=>m.LandingPageComponent)},
  {path:'',loadComponent:()=>import('./layout/auth-layout').then(m=>m.AuthLayoutComponent),children:[
-  {path:'login',loadComponent:()=>import('./features/auth/auth-page').then(m=>m.AuthPageComponent)},
+  {path:'login',canActivate:[guestGuard],loadComponent:()=>import('./features/auth/auth-page').then(m=>m.AuthPageComponent)},
   {path:'register',data:{register:true},loadComponent:()=>import('./features/auth/auth-page').then(m=>m.AuthPageComponent)},
  ]},
  {path:'',canActivate:[authGuard],loadComponent:()=>import('./layout/app-layout').then(m=>m.AppLayoutComponent),children:[

@@ -4,7 +4,7 @@ namespace eStok.Domain.Entities;
 
 public sealed class Sale : TenantEntity
 {
-    public Guid CustomerId { get; set; }
+    public Guid? CustomerId { get; set; }
     public Guid WarehouseId { get; set; }
     public string SaleNumber { get; set; } = "";
     public DateTime SaleDate { get; set; }
@@ -44,7 +44,7 @@ public sealed class PaymentMethod : TenantEntity
 
 public sealed class Payment : TenantEntity
 {
-    public Guid CustomerId { get; set; }
+    public Guid? CustomerId { get; set; }
     public Guid? SaleId { get; set; }
     public Guid PaymentMethodId { get; set; }
     public decimal Amount { get; set; }

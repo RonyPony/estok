@@ -6,6 +6,9 @@ import { AuthService } from './auth.service';
 import { AuthStateService } from './auth-state.service';
 import { Session } from '../models/session';
 import { environment } from '../../../environments/environment';
+import { guestGuard } from '../guards/auth.guard';
+import { ActivatedRouteSnapshot, Router, RouterStateSnapshot } from '@angular/router';
+import { isObservable } from 'rxjs';
 
 describe('AuthService refresh coordination', () => {
   let http: HttpTestingController;
@@ -32,5 +35,17 @@ describe('AuthService refresh coordination', () => {
     http.expectOne(`${environment.apiBaseUrl}/auth/refresh`).flush({}, { status: 401, statusText: 'Unauthorized' });
     expect(rejected).toBe(true);
     expect(TestBed.inject(AuthStateService).session()).toBeNull();
+  });
+  it('restores the session on the public entry page without asking for credentials', () => {
+    const result = TestBed.runInInjectionContext(() => guestGuard({} as ActivatedRouteSnapshot, {} as RouterStateSnapshot));
+    expect(isObservable(result)).toBe(true);
+    if (isObservable(result)) result.subscribe(destination => expect(TestBed.inject(Router).serializeUrl(destination as any)).toBe('/dashboard'));
+    http.expectOne(`${environment.apiBaseUrl}/auth/refresh`).flush(session);
+    expect(TestBed.inject(AuthStateService).session()).toEqual(session);
+  });
+  it('allows the public entry page when the persistent session has expired', () => {
+    const result = TestBed.runInInjectionContext(() => guestGuard({} as ActivatedRouteSnapshot, {} as RouterStateSnapshot));
+    if (isObservable(result)) result.subscribe(destination => expect(destination).toBe(true));
+    http.expectOne(`${environment.apiBaseUrl}/auth/refresh`).flush({}, {status:401,statusText:'Unauthorized'});
   });
 });

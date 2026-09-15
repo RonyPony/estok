@@ -9,22 +9,23 @@ namespace eStok.Application.Features.Sales;
 
 public sealed record LineRequest(Guid ProductId, decimal Quantity, decimal Discount = 0);
 public sealed record InitialPaymentRequest(Guid PaymentMethodId, decimal Amount, string? Reference = null);
-public sealed record SaleRequest(Guid CustomerId, Guid WarehouseId, List<LineRequest> Items, string? Notes = null, DateTime? DueDate = null, List<InitialPaymentRequest>? Payments = null);
+public sealed record SaleRequest(Guid? CustomerId, Guid WarehouseId, List<LineRequest> Items, string? Notes = null, DateTime? DueDate = null, List<InitialPaymentRequest>? Payments = null);
 public interface IDocumentSequenceService { Task<string> NextAsync(DocumentType type, CancellationToken ct); }
 public sealed class DocumentSequenceService(IApplicationDbContext db, ICurrentBusiness business) : IDocumentSequenceService
 {
     public async Task<string> NextAsync(DocumentType type, CancellationToken ct) => (await db.Sequences.SingleAsync(x => x.BusinessId == business.BusinessId && x.DocumentType == type, ct)).Next();
 }
-public sealed class SalesService(IApplicationDbContext db, ICurrentBusiness business, ICurrentUser user, IDateTimeProvider clock, IInventoryService inventory, IDocumentSequenceService sequences, PaymentService payments)
+public sealed class SalesService(IApplicationDbContext db, ICurrentBusiness business, ICurrentUser user, IDateTimeProvider clock, IInventoryService inventory, IDocumentSequenceService sequences, PaymentService payments, IDocumentService documents)
 {
     public Task<PagedResult<Sale>> ListAsync(PagedRequest request, CancellationToken ct) => db.Sales.AsNoTracking().Where(x => x.BusinessId == business.BusinessId && (request.Search == null || x.SaleNumber.Contains(request.Search))).OrderByDescending(x => x.CreatedAt).PageAsync(request, ct);
     public async Task<Sale> GetAsync(Guid id, CancellationToken ct) => await db.Sales.Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == id && x.BusinessId == business.BusinessId, ct) ?? throw AppException.NotFound();
     public Task<Sale> CreateAsync(SaleRequest request, CancellationToken ct) => db.InTransactionAsync(() => CreateCoreAsync(request, null, ct), ct);
     public async Task<Sale> CreateCoreAsync(SaleRequest request, Quote? quote, CancellationToken ct)
     {
-        var customer = await db.Customers.SingleOrDefaultAsync(x => x.Id == request.CustomerId && x.BusinessId == business.BusinessId && x.IsActive, ct) ?? throw AppException.NotFound();
+        var customer = request.CustomerId.HasValue ? await db.Customers.SingleOrDefaultAsync(x => x.Id == request.CustomerId && x.BusinessId == business.BusinessId && x.IsActive, ct) ?? throw AppException.NotFound() : null;
         if (!await db.Warehouses.AnyAsync(x => x.Id == request.WarehouseId && x.BusinessId == business.BusinessId && x.IsActive, ct)) throw AppException.NotFound();
         if (request.Items.Count is 0 or > 100) throw new AppException("INVALID_ITEMS", "Agrega entre 1 y 100 productos.");
+        if (request.Items.Select(x => x.ProductId).Distinct().Count() != request.Items.Count) throw new AppException("DUPLICATE_PRODUCT", "El producto ya está en la venta. Modifica su cantidad.");
         var sale = new Sale { BusinessId = business.BusinessId, CustomerId = request.CustomerId, WarehouseId = request.WarehouseId, SaleDate = clock.UtcNow, CreatedBy = user.UserId, Notes = request.Notes, SaleNumber = await sequences.NextAsync(DocumentType.Sale, ct) };
         for (var index = 0; index < request.Items.Count; index++)
         {
@@ -40,19 +41,21 @@ public sealed class SalesService(IApplicationDbContext db, ICurrentBusiness busi
         }
         sale.Subtotal = sale.Items.Sum(x => x.Subtotal); sale.Discount = sale.Items.Sum(x => x.Discount); sale.Tax = sale.Items.Sum(x => x.Tax); sale.Total = sale.Items.Sum(x => x.Total); sale.Balance = sale.Total;
         sale.PaymentStatus = sale.Total == 0 ? PaymentStatus.Paid : PaymentStatus.Pending;
-        if (customer.CreditLimit.HasValue)
+        if (customer?.CreditLimit.HasValue == true)
         {
             var debt = await db.Receivables.Where(x => x.BusinessId == business.BusinessId && x.CustomerId == customer.Id && x.Status != ReceivableStatus.Cancelled).SumAsync(x => x.Balance, ct);
             if (debt + sale.Total - (request.Payments?.Sum(x => x.Amount) ?? 0) > customer.CreditLimit) throw AppException.Conflict("La venta supera el límite de crédito del cliente.");
         }
+        if (customer is null && (request.Payments?.Sum(x => x.Amount) ?? 0) != sale.Total) throw AppException.Conflict("La venta sin cliente debe pagarse completamente al contado.");
         db.Sales.Add(sale);
-        if (sale.Balance > 0) db.Receivables.Add(new AccountsReceivable { BusinessId = business.BusinessId, CustomerId = sale.CustomerId, SaleId = sale.Id, OriginalAmount = sale.Total, Balance = sale.Total, DueDate = request.DueDate, Status = ReceivableStatus.Pending });
+        if (sale.Balance > 0 && sale.CustomerId.HasValue) db.Receivables.Add(new AccountsReceivable { BusinessId = business.BusinessId, CustomerId = sale.CustomerId!.Value, SaleId = sale.Id, OriginalAmount = sale.Total, Balance = sale.Total, DueDate = request.DueDate, Status = ReceivableStatus.Pending });
         if (request.Payments is { Count: > 0 })
         {
             if (request.Payments.Count > 20) throw new AppException("INVALID_PAYMENTS", "Usa hasta 20 pagos por venta.");
             await db.SaveChangesAsync(ct);
             foreach (var payment in request.Payments) await payments.CreateAsync(new PaymentRequest(sale.Id, payment.PaymentMethodId, payment.Amount, payment.Reference), ct);
         }
+        await documents.StoreAsync(sale, ct);
         return sale;
     }
     public Task<Sale> CancelAsync(Guid id, CancellationToken ct) => db.InTransactionAsync(async () =>

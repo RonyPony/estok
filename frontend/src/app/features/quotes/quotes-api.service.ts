@@ -8,6 +8,7 @@ export interface Quote {notes:string|null;expirationDate:string;id:string;custom
 export class QuotesApiService {
  private readonly http=inject(HttpClient);private readonly url=environment.apiBaseUrl+'/quotes';
  list(pageNumber=1){return this.http.get<PagedResult<Quote>>(this.url,{params:{pageNumber,pageSize:20}});}
+ pdf(id:string){return this.http.get(this.url+"/"+id+"/pdf",{responseType:"blob"});}
  get(id:string){return this.http.get<Quote>(this.url+'/'+id);}
  create(request:DocumentRequest){return this.http.post<Quote>(this.url,request);}
  update(id:string,request:{status:string;notes:string;expirationDate:string}){return this.http.put<Quote>(this.url+'/'+id,request);}

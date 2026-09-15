@@ -5,6 +5,75 @@ using System.Text.Json;
 namespace eStok.IntegrationTests;
 public sealed class BusinessFlowTests
 {
+    [Fact]
+    public async Task PersistentSession_RefreshesInNewClient_AndLogoutRevokesCookie()
+    {
+        using var factory = new ApiFactory(); using var original = factory.CreateReadyClient();
+        await RegisterAsync(factory, original, "persistent@example.com");
+        var login = await original.PostAsJsonAsync("/api/auth/login", new { email = "persistent@example.com", password = "StrongPassword123!" });
+        var cookie = login.Headers.GetValues("Set-Cookie").Single();
+        Assert.Contains("httponly", cookie.ToLowerInvariant()); Assert.Contains("secure", cookie.ToLowerInvariant()); Assert.Contains("max-age=2592000", cookie);
+        Assert.DoesNotContain("refreshToken", await login.Content.ReadAsStringAsync());
+        using var reopened = factory.CreateReadyClient();
+        reopened.DefaultRequestHeaders.Add("Cookie", cookie.Split(';')[0]);
+        var refresh = await reopened.PostAsJsonAsync("/api/auth/refresh", new { });
+        Assert.Equal(HttpStatusCode.OK, refresh.StatusCode);
+        var renewed = refresh.Headers.GetValues("Set-Cookie").Single().Split(';')[0];
+        Assert.NotEqual(cookie.Split(';')[0], renewed);
+        reopened.DefaultRequestHeaders.Remove("Cookie"); reopened.DefaultRequestHeaders.Add("Cookie", renewed);
+        Assert.Equal(HttpStatusCode.NoContent, (await reopened.PostAsJsonAsync("/api/auth/logout", new { })).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await reopened.PostAsJsonAsync("/api/auth/refresh", new { })).StatusCode);
+    }
+    [Fact]
+    public async Task CashSales_Documents_Logo_AndDuplicateValidation()
+    {
+        using var factory = new ApiFactory(); using var a = factory.CreateReadyClient(); using var b = factory.CreateReadyClient();
+        await RegisterAsync(factory, a, "cash@example.com"); await RegisterAsync(factory, b, "other@example.com");
+        var warehouseId = (await a.GetFromJsonAsync<JsonElement>("/api/warehouses"))[0].GetProperty("id").GetGuid();
+        var methods = await a.GetFromJsonAsync<JsonElement>("/api/payment-methods");
+        var methodId = methods.EnumerateArray().First(x => x.GetProperty("type").GetString() == "Cash").GetProperty("id").GetGuid();
+        var productId = (await PostAsync(a, "/api/products", new { sku = "CASH", name = "Café de especialidad · Edición selección", cost = 5, salePrice = 10, trackInventory = false })).GetProperty("id").GetGuid();
+        var line = new { productId, quantity = 2 };
+        Assert.Equal(HttpStatusCode.Conflict, (await a.PostAsJsonAsync("/api/sales", new { warehouseId, items = new[] { line } })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await a.PostAsJsonAsync("/api/sales", new { warehouseId, items = new[] { line, line } })).StatusCode);
+        using var invalidLogo = new MultipartFormDataContent(); invalidLogo.Add(new ByteArrayContent("not an image"u8.ToArray()), "file", "logo.png");
+        Assert.Equal(HttpStatusCode.BadRequest, (await a.PutAsync("/api/settings/logo", invalidLogo)).StatusCode);
+        // A valid PNG is stored and rendered without fetching arbitrary remote URLs.
+        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAHgAAAAoCAIAAAC6iKlyAAAAZElEQVR4nO3QAQkAIADAMFPZxei2sYXCHTzA2Zhr60Lj+cEngQbdCjToVqBBtwINuhVo0K1Ag24FGnQr0KBbgQbdCjToVqBBtwINuhVo0K1Ag24FGnQr0KBbgQbdCjToVqBBtzr0hl+HTlPwhQAAAABJRU5ErkJggg==");
+        using var logo = new MultipartFormDataContent(); logo.Add(new ByteArrayContent(png), "file", "logo.png");
+        var uploaded = await a.PutAsync("/api/settings/logo", logo);
+        Assert.True(uploaded.IsSuccessStatusCode, await uploaded.Content.ReadAsStringAsync());
+        Assert.StartsWith("data:image/png;base64,", (await a.GetFromJsonAsync<JsonElement>("/api/settings")).GetProperty("logo").GetString());
+        var sale = await PostAsync(a, "/api/sales", new { warehouseId, items = new[] { line }, payments = new[] { new { paymentMethodId = methodId, amount = 20 } } });
+        var saleId = sale.GetProperty("id").GetGuid();
+        Assert.Equal(JsonValueKind.Null, sale.GetProperty("customerId").ValueKind);
+        Assert.Equal("Paid", sale.GetProperty("paymentStatus").GetString()); Assert.Equal(0, sale.GetProperty("balance").GetDecimal());
+        Assert.Empty((await a.GetFromJsonAsync<JsonElement>("/api/customers")).GetProperty("items").EnumerateArray());
+        Assert.Empty((await a.GetFromJsonAsync<JsonElement>("/api/accounts-receivable")).GetProperty("items").EnumerateArray());
+        var pdf = await a.GetAsync($"/api/sales/{saleId}/pdf"); Assert.Equal("application/pdf", pdf.Content.Headers.ContentType?.MediaType);
+        var content = await pdf.Content.ReadAsByteArrayAsync(); Assert.True(content.AsSpan().StartsWith("%PDF"u8));
+        Assert.Equal(content, await a.GetByteArrayAsync($"/api/sales/{saleId}/pdf"));
+        Assert.Equal(HttpStatusCode.NotFound, (await b.GetAsync($"/api/sales/{saleId}/pdf")).StatusCode);
+        var customerId = (await PostAsync(a, "/api/customers", new { code = "C1", firstName = "María", lastName = "Peña" })).GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.BadRequest, (await a.PostAsJsonAsync("/api/quotes", new { customerId, items = new[] { line, line } })).StatusCode);
+        var quote = await PostAsync(a, "/api/quotes", new { customerId, items = new[] { line }, notes = "Cotización válida según disponibilidad." });
+        var quoteId = quote.GetProperty("id").GetGuid();
+        var quotePdf = await a.GetByteArrayAsync($"/api/quotes/{quoteId}/pdf"); Assert.True(quotePdf.AsSpan().StartsWith("%PDF"u8));
+        Assert.Equal(HttpStatusCode.NotFound, (await b.GetAsync($"/api/quotes/{quoteId}/pdf")).StatusCode);
+        var output = Environment.GetEnvironmentVariable("ESTOK_PDF_TEST_OUTPUT");
+        if (!string.IsNullOrEmpty(output)) { Directory.CreateDirectory(output); await File.WriteAllBytesAsync(Path.Combine(output, "factura.pdf"), content); await File.WriteAllBytesAsync(Path.Combine(output, "presupuesto.pdf"), quotePdf); }
+        var manyLines = new List<object>();
+        for (var i = 0; i < 40; i++)
+        {
+            var id = (await PostAsync(a, "/api/products", new { sku = $"PAGE-{i}", name = $"Producto {i + 1:00} · Café, té y selección de artículos para la oficina", cost = 5, salePrice = 10, taxRate = 18, trackInventory = false })).GetProperty("id").GetGuid();
+            manyLines.Add(new { productId = id, quantity = 3, discount = 1 });
+        }
+        var largeQuote = await PostAsync(a, "/api/quotes", new { customerId, items = manyLines, notes = "Entrega según disponibilidad. Gracias por su preferencia." });
+        var largePdf = await a.GetByteArrayAsync($"/api/quotes/{largeQuote.GetProperty("id").GetGuid()}/pdf");
+        using var parsed = PdfSharp.Pdf.IO.PdfReader.Open(new MemoryStream(largePdf), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
+        Assert.True(parsed.PageCount > 1);
+        if (!string.IsNullOrEmpty(output)) await File.WriteAllBytesAsync(Path.Combine(output, "presupuesto-multipagina.pdf"), largePdf);
+    }
     private static async Task<JsonElement> PostAsync(HttpClient client, string path, object body)
     {
         var response = await client.PostAsJsonAsync(path, body);

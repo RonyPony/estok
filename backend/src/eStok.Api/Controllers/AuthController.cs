@@ -13,6 +13,7 @@ public sealed class AuthController(IAuthService auth, IValidator<RegisterRequest
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginRequest request, CancellationToken ct)
     {
+        ValidateOrigin();
         return Session(await auth.LoginAsync(request, ct));
     }
 
@@ -29,9 +30,9 @@ public sealed class AuthController(IAuthService auth, IValidator<RegisterRequest
     private CookieOptions CookieOptions()
     {
         var secure = !HttpContext.RequestServices.GetRequiredService<IWebHostEnvironment>().IsDevelopment();
-        return new() { HttpOnly = true, Secure = secure || Request.IsHttps, SameSite = secure ? SameSiteMode.None : SameSiteMode.Lax, Path = "/api/auth", Expires = DateTimeOffset.UtcNow.AddDays(30) };
+        return new() { HttpOnly = true, Secure = secure || Request.IsHttps, SameSite = secure ? SameSiteMode.None : SameSiteMode.Lax, Path = "/api/auth", Expires = DateTimeOffset.UtcNow.AddDays(30), MaxAge = TimeSpan.FromDays(30) };
     }
 
-    private IActionResult Session(SessionResponse session) { Response.Cookies.Append("refresh_token", session.RefreshToken, CookieOptions()); return Ok(new { session.AccessToken, session.User, session.Business, session.Permissions }); }
+    private IActionResult Session(SessionResponse session) { Response.Headers.CacheControl = "no-store"; Response.Cookies.Append("refresh_token", session.RefreshToken, CookieOptions()); return Ok(new { session.AccessToken, session.User, session.Business, session.Permissions }); }
     private void ValidateOrigin() { var origin = Request.Headers.Origin.ToString(); if (origin.Length > 0 && !(config.GetSection("AllowedOrigins").Get<string[]>() ?? ["http://localhost:4200"]).Contains(origin)) throw new eStok.Application.Common.AppException("INVALID_ORIGIN", "Origen no permitido.", 403); }
 }

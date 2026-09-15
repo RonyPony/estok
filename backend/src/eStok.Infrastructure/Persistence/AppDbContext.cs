@@ -15,6 +15,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
 {
     private Guid TenantId => business.BusinessId;
     internal bool IsInitializing { get; set; }
+    public DbSet<BusinessDocument> Documents => Set<BusinessDocument>();
     public DbSet<Business> Businesses => Set<Business>();
     public DbSet<BusinessUser> BusinessUsers => Set<BusinessUser>();
     public DbSet<Role> Roles => Set<Role>();

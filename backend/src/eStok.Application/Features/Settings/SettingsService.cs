@@ -5,9 +5,20 @@ using eStok.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 namespace eStok.Application.Features.Settings;
 public sealed record SettingsRequest(string Name, string Currency, string Country, string TimeZone, bool AllowNegativeStock, decimal DefaultTaxRate, int QuoteExpirationDays, string InvoicePrefix, string QuotePrefix);
-public sealed class SettingsService(IApplicationDbContext db, ICurrentBusiness business)
+public sealed class SettingsService(IApplicationDbContext db, ICurrentBusiness business, IDocumentService documents)
 {
-    public async Task<object> GetAsync(CancellationToken ct) => new { Business = await db.Businesses.SingleAsync(x => x.Id == business.BusinessId, ct), Settings = await db.Settings.SingleAsync(x => x.BusinessId == business.BusinessId, ct) };
+    public async Task<object> GetAsync(CancellationToken ct)
+    {
+        var company = await db.Businesses.AsNoTracking().SingleAsync(x => x.Id == business.BusinessId, ct);
+        return new { Business = company, Settings = await db.Settings.SingleAsync(x => x.BusinessId == business.BusinessId, ct), Logo = LogoData(company.LogoContent) };
+    }
+    private static string? LogoData(byte[]? content) => content is { Length: > 0 } ? $"data:image/{(content[0] == 137 ? "png" : "jpeg")};base64,{Convert.ToBase64String(content)}" : null;
+    public Task<object> SaveLogoAsync(byte[] content, CancellationToken ct) => db.InTransactionAsync<object>(async () =>
+    {
+        var company = await db.Businesses.SingleAsync(x => x.Id == business.BusinessId, ct);
+        company.LogoContent = documents.ValidateLogo(content);
+        return new { Logo = LogoData(company.LogoContent) };
+    }, ct);
     public Task<object> SaveAsync(SettingsRequest request, CancellationToken ct) => db.InTransactionAsync<object>(async () =>
     {
         if (string.IsNullOrWhiteSpace(request.Name))

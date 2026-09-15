@@ -231,6 +231,9 @@ namespace eStok.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<byte[]>("LogoContent")
+                        .HasColumnType("varbinary(max)");
+
                     b.Property<string>("LogoUrl")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
@@ -259,6 +262,44 @@ namespace eStok.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("Businesses");
+                });
+
+            modelBuilder.Entity("eStok.Domain.Entities.BusinessDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("Content")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("DocumentType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "DocumentType", "SourceId")
+                        .IsUnique();
+
+                    b.ToTable("Documents");
                 });
 
             modelBuilder.Entity("eStok.Domain.Entities.BusinessSettings", b =>
@@ -631,7 +672,7 @@ namespace eStok.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("CustomerId")
+                    b.Property<Guid?>("CustomerId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Notes")
@@ -1166,7 +1207,7 @@ namespace eStok.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("CreatedBy")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("CustomerId")
+                    b.Property<Guid?>("CustomerId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<decimal>("Discount")
@@ -1530,6 +1571,15 @@ namespace eStok.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("eStok.Domain.Entities.BusinessDocument", b =>
+                {
+                    b.HasOne("eStok.Domain.Entities.Business", null)
+                        .WithMany()
+                        .HasForeignKey("BusinessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("eStok.Domain.Entities.BusinessSettings", b =>
                 {
                     b.HasOne("eStok.Domain.Entities.Business", null)
@@ -1630,8 +1680,7 @@ namespace eStok.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("BusinessId", "CustomerId")
                         .HasPrincipalKey("BusinessId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("eStok.Domain.Entities.PaymentMethod", null)
                         .WithMany()
@@ -1790,8 +1839,7 @@ namespace eStok.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("BusinessId", "CustomerId")
                         .HasPrincipalKey("BusinessId", "Id")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("eStok.Domain.Entities.Warehouse", null)
                         .WithMany()

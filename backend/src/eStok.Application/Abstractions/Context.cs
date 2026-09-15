@@ -7,6 +7,7 @@ public interface ICurrentUser { Guid UserId { get; } string? Email { get; } bool
 public interface IDateTimeProvider { DateTime UtcNow { get; } }
 public interface IApplicationDbContext
 {
+    DbSet<BusinessDocument> Documents { get; }
     DbSet<Business> Businesses { get; }
     DbSet<BusinessUser> BusinessUsers { get; }
     DbSet<Role> Roles { get; }
