@@ -58,4 +58,7 @@ public sealed class BusinessSettings : TenantEntity
     public string InvoicePrefix { get; set; } = "FAC";
     public string QuotePrefix { get; set; } = "COT";
     public string PurchasePrefix { get; set; } = "COM";
+    public string? InvoiceAdditionalInfo { get; set; }
+    public decimal InvoiceLogoScale { get; set; } = 1;
+    public bool AllowDuplicateSaleItems { get; set; }
 }

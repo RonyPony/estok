@@ -11,5 +11,8 @@ public sealed class BusinessSettingsConfiguration : IEntityTypeConfiguration<Bus
         b.HasAlternateKey(x => new { x.BusinessId, x.Id });
         b.HasOne<Business>().WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => x.BusinessId).IsUnique();
+        b.Property(x => x.InvoiceAdditionalInfo).HasMaxLength(1000);
+        b.Property(x => x.InvoiceLogoScale).HasDefaultValue(1m);
+        b.Property(x => x.AllowDuplicateSaleItems).HasDefaultValue(false);
     }
 }

@@ -13,6 +13,8 @@ public sealed class Sale : TenantEntity
     public decimal Discount { get; set; }
     public decimal Tax { get; set; }
     public decimal Total { get; set; }
+    public bool SellerAssumesTax { get; set; }
+    public bool IncludeCategoriesInReceipt { get; set; }
     public decimal PaidAmount { get; set; }
     public decimal Balance { get; set; }
     public PaymentStatus PaymentStatus { get; set; }
@@ -33,6 +35,8 @@ public sealed class SaleItem : TenantEntity
     public decimal Tax { get; set; }
     public decimal Subtotal { get; set; }
     public decimal Total { get; set; }
+    public string? Comment { get; set; }
+    public string? CategoryName { get; set; }
 }
 
 public sealed class PaymentMethod : TenantEntity

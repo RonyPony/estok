@@ -11,5 +11,7 @@ public sealed class SaleItemConfiguration : IEntityTypeConfiguration<SaleItem>
         b.HasAlternateKey(x => new { x.BusinessId, x.Id });
         b.HasOne<Business>().WithMany().HasForeignKey(x => x.BusinessId).OnDelete(DeleteBehavior.Restrict);
          b.HasOne<Product>().WithMany().HasForeignKey(x => new { x.BusinessId, x.ProductId }).HasPrincipalKey(x => new { x.BusinessId, x.Id }).OnDelete(DeleteBehavior.Restrict);
+        b.Property(x => x.Comment).HasMaxLength(300);
+        b.Property(x => x.CategoryName).HasMaxLength(200);
     }
 }

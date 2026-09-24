@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using eStok.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using eStok.Infrastructure.Persistence;
 namespace eStok.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260921162529_SalesReceiptOptionsAndBusinessInvoiceInfo")]
+    partial class SalesReceiptOptionsAndBusinessInvoiceInfo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -308,11 +311,6 @@ namespace eStok.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<bool>("AllowDuplicateSaleItems")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bit")
-                        .HasDefaultValue(false);
-
                     b.Property<bool>("AllowNegativeStock")
                         .HasColumnType("bit");
 
@@ -339,12 +337,6 @@ namespace eStok.Infrastructure.Persistence.Migrations
                     b.Property<string>("InvoiceAdditionalInfo")
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
-
-                    b.Property<decimal>("InvoiceLogoScale")
-                        .ValueGeneratedOnAdd()
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)")
-                        .HasDefaultValue(1m);
 
                     b.Property<string>("InvoicePrefix")
                         .IsRequired()

@@ -5,7 +5,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-export interface FormField { key: string; label: string; type?: 'text' | 'number' | 'email' | 'password' | 'checkbox'; }
+export interface FormField { key: string; label: string; type?: 'text' | 'number' | 'email' | 'password' | 'checkbox' | 'textarea'; }
 @Component({
   selector: 'app-record-form',
   imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatCheckboxModule, MatButtonModule, MatIconModule],
@@ -17,7 +17,11 @@ export interface FormField { key: string; label: string; type?: 'text' | 'number
         } @else {
           <mat-form-field appearance="outline">
             <mat-label>{{ field.label }}</mat-label>
-            <input matInput [type]="field.type === 'password' && visiblePasswords()[field.key] ? 'text' : (field.type ?? 'text')" [formControlName]="field.key" />
+            @if (field.type === 'textarea') {
+              <textarea matInput rows="4" [formControlName]="field.key"></textarea>
+            } @else {
+              <input matInput [type]="field.type === 'password' && visiblePasswords()[field.key] ? 'text' : (field.type ?? 'text')" [formControlName]="field.key" />
+            }
             @if (field.type === 'password') {
               <button mat-icon-button matSuffix type="button" (click)="togglePassword(field.key)"
                 [attr.aria-label]="visiblePasswords()[field.key] ? 'Ocultar contraseña' : 'Mostrar contraseña'"

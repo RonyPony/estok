@@ -6,18 +6,23 @@ using Microsoft.EntityFrameworkCore;
 namespace eStok.Application.Features.Products;
 
 public sealed record ProductRequest(string Sku, string Name, decimal Cost, decimal SalePrice, decimal TaxRate = 0, bool TrackInventory = true, decimal MinimumStock = 0, Guid? CategoryId = null, string? Barcode = null, string? Description = null, bool IsActive = true);
+public sealed record ProductListItem(Guid Id, Guid? CategoryId, string Sku, string? Barcode, string Name, string? Description, decimal Cost, decimal SalePrice, decimal TaxRate, bool TrackInventory, decimal MinimumStock, string? ImageUrl, bool IsActive, string? CategoryName);
 public sealed class ProductValidator : AbstractValidator<ProductRequest>
 {
     public ProductValidator() { RuleFor(x => x.Sku).NotEmpty().MaximumLength(100); RuleFor(x => x.Name).NotEmpty().MaximumLength(200); RuleFor(x => x.Cost).InclusiveBetween(0, 999999999); RuleFor(x => x.SalePrice).InclusiveBetween(0, 999999999); RuleFor(x => x.TaxRate).InclusiveBetween(0, 100); RuleFor(x => x.MinimumStock).GreaterThanOrEqualTo(0); }
 }
 public sealed class ProductService(IApplicationDbContext db, ICurrentBusiness business, IValidator<ProductRequest> validator)
 {
-    public Task<PagedResult<Product>> ListAsync(PagedRequest request, CancellationToken ct)
+    public async Task<PagedResult<ProductListItem>> ListAsync(PagedRequest request, CancellationToken ct)
     {
         var query = db.Products.AsNoTracking().Where(x => x.BusinessId == business.BusinessId);
         if (!string.IsNullOrWhiteSpace(request.Search)) query = query.Where(x => x.Name.Contains(request.Search) || x.Sku.Contains(request.Search));
         var ordered = (request.SortBy, request.SortDirection) switch { ("salePrice", "desc") => query.OrderByDescending(x => x.SalePrice), ("salePrice", _) => query.OrderBy(x => x.SalePrice), (_, "desc") => query.OrderByDescending(x => x.Name), _ => query.OrderBy(x => x.Name) };
-        return ordered.PageAsync(request, ct);
+        var projected = from product in ordered
+                        join category in db.Categories.AsNoTracking() on product.CategoryId equals category.Id into categories
+                        from category in categories.DefaultIfEmpty()
+                        select new ProductListItem(product.Id, product.CategoryId, product.Sku, product.Barcode, product.Name, product.Description, product.Cost, product.SalePrice, product.TaxRate, product.TrackInventory, product.MinimumStock, product.ImageUrl, product.IsActive, category == null ? null : category.Name);
+        return await projected.PageAsync(request, ct);
     }
     public async Task<Product> GetAsync(Guid id, CancellationToken ct) => await db.Products.SingleOrDefaultAsync(x => x.Id == id && x.BusinessId == business.BusinessId, ct) ?? throw AppException.NotFound();
     public async Task<Product> SaveAsync(Guid? id, ProductRequest request, CancellationToken ct)

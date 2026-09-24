@@ -7,9 +7,9 @@ using eStok.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 namespace eStok.Application.Features.Sales;
 
-public sealed record LineRequest(Guid ProductId, decimal Quantity, decimal Discount = 0);
+public sealed record LineRequest(Guid ProductId, decimal Quantity, decimal Discount = 0, string? Comment = null);
 public sealed record InitialPaymentRequest(Guid PaymentMethodId, decimal Amount, string? Reference = null);
-public sealed record SaleRequest(Guid? CustomerId, Guid WarehouseId, List<LineRequest> Items, string? Notes = null, DateTime? DueDate = null, List<InitialPaymentRequest>? Payments = null);
+public sealed record SaleRequest(Guid? CustomerId, Guid WarehouseId, List<LineRequest> Items, string? Notes = null, DateTime? DueDate = null, List<InitialPaymentRequest>? Payments = null, bool SellerAssumesTax = false, bool IncludeCategoriesInReceipt = false);
 public interface IDocumentSequenceService { Task<string> NextAsync(DocumentType type, CancellationToken ct); }
 public sealed class DocumentSequenceService(IApplicationDbContext db, ICurrentBusiness business) : IDocumentSequenceService
 {
@@ -25,21 +25,24 @@ public sealed class SalesService(IApplicationDbContext db, ICurrentBusiness busi
         var customer = request.CustomerId.HasValue ? await db.Customers.SingleOrDefaultAsync(x => x.Id == request.CustomerId && x.BusinessId == business.BusinessId && x.IsActive, ct) ?? throw AppException.NotFound() : null;
         if (!await db.Warehouses.AnyAsync(x => x.Id == request.WarehouseId && x.BusinessId == business.BusinessId && x.IsActive, ct)) throw AppException.NotFound();
         if (request.Items.Count is 0 or > 100) throw new AppException("INVALID_ITEMS", "Agrega entre 1 y 100 productos.");
-        if (request.Items.Select(x => x.ProductId).Distinct().Count() != request.Items.Count) throw new AppException("DUPLICATE_PRODUCT", "El producto ya está en la venta. Modifica su cantidad.");
-        var sale = new Sale { BusinessId = business.BusinessId, CustomerId = request.CustomerId, WarehouseId = request.WarehouseId, SaleDate = clock.UtcNow, CreatedBy = user.UserId, Notes = request.Notes, SaleNumber = await sequences.NextAsync(DocumentType.Sale, ct) };
+        var allowDuplicateItems = await db.Settings.Where(x => x.BusinessId == business.BusinessId).Select(x => x.AllowDuplicateSaleItems).SingleAsync(ct);
+        if (!allowDuplicateItems && request.Items.Select(x => x.ProductId).Distinct().Count() != request.Items.Count) throw new AppException("DUPLICATE_PRODUCT", "El producto ya está en la venta. Modifica su cantidad.");
+        var sale = new Sale { BusinessId = business.BusinessId, CustomerId = request.CustomerId, WarehouseId = request.WarehouseId, SaleDate = clock.UtcNow, CreatedBy = user.UserId, Notes = request.Notes, SaleNumber = await sequences.NextAsync(DocumentType.Sale, ct), SellerAssumesTax = request.SellerAssumesTax, IncludeCategoriesInReceipt = request.IncludeCategoriesInReceipt };
         for (var index = 0; index < request.Items.Count; index++)
         {
             var line = request.Items[index];
             var product = await db.Products.SingleOrDefaultAsync(x => x.Id == line.ProductId && x.BusinessId == business.BusinessId && x.IsActive, ct) ?? throw AppException.NotFound();
+            var categoryName = product.CategoryId.HasValue ? await db.Categories.Where(x => x.Id == product.CategoryId && x.BusinessId == business.BusinessId).Select(x => x.Name).SingleOrDefaultAsync(ct) : null;
             var snapshot = quote?.Items[index];
             var price = snapshot?.UnitPrice ?? product.SalePrice;
             ValidateLine(line, price);
             var subtotal = Money(line.Quantity * price);
             var tax = snapshot?.Tax ?? Money((subtotal - line.Discount) * product.TaxRate / 100);
-            sale.Items.Add(new SaleItem { BusinessId = business.BusinessId, SaleId = sale.Id, ProductId = product.Id, Description = snapshot?.Description ?? product.Name, Quantity = line.Quantity, UnitPrice = price, UnitCost = product.Cost, Discount = line.Discount, Subtotal = subtotal, Tax = tax, Total = subtotal - line.Discount + tax });
+            var itemTotal = subtotal - line.Discount + (sale.SellerAssumesTax ? -tax : tax);
+            sale.Items.Add(new SaleItem { BusinessId = business.BusinessId, SaleId = sale.Id, ProductId = product.Id, Description = snapshot?.Description ?? product.Name, Quantity = line.Quantity, UnitPrice = price, UnitCost = product.Cost, Discount = line.Discount, Subtotal = subtotal, Tax = tax, Total = itemTotal, Comment = string.IsNullOrWhiteSpace(line.Comment) ? null : line.Comment.Trim(), CategoryName = categoryName });
             if (product.TrackInventory) await inventory.DecreaseStockAsync(product.Id, request.WarehouseId, line.Quantity, InventoryMovementType.Sale, sale.Id, ct);
         }
-        sale.Subtotal = sale.Items.Sum(x => x.Subtotal); sale.Discount = sale.Items.Sum(x => x.Discount); sale.Tax = sale.Items.Sum(x => x.Tax); sale.Total = sale.Items.Sum(x => x.Total); sale.Balance = sale.Total;
+        sale.Subtotal = sale.Items.Sum(x => x.Subtotal); sale.Discount = sale.Items.Sum(x => x.Discount); sale.Tax = sale.Items.Sum(x => x.Tax); sale.Total = sale.Subtotal - sale.Discount + (sale.SellerAssumesTax ? -sale.Tax : sale.Tax); sale.Balance = sale.Total;
         sale.PaymentStatus = sale.Total == 0 ? PaymentStatus.Paid : PaymentStatus.Pending;
         if (customer?.CreditLimit.HasValue == true)
         {
@@ -73,6 +76,6 @@ public sealed class SalesService(IApplicationDbContext db, ICurrentBusiness busi
     public static decimal Money(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
     public static void ValidateLine(LineRequest line, decimal price)
     {
-        if (line.Quantity <= 0 || line.Quantity > 1000000 || decimal.Round(line.Quantity, 4) != line.Quantity || line.Discount < 0 || line.Discount > Money(line.Quantity * price) || Money(line.Discount) != line.Discount) throw new AppException("INVALID_LINE", "Cantidad o descuento inválidos.");
+        if (line.Quantity <= 0 || line.Quantity > 1000000 || decimal.Round(line.Quantity, 4) != line.Quantity || line.Discount < 0 || line.Discount > Money(line.Quantity * price) || Money(line.Discount) != line.Discount || line.Comment?.Length > 300) throw new AppException("INVALID_LINE", "Cantidad, descuento o comentario inválidos.");
     }
 }

@@ -130,4 +130,72 @@ public sealed class BusinessFlowTests
         Assert.Equal(HttpStatusCode.NoContent, (await a.PostAsJsonAsync("/api/auth/logout", new { })).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await a.PostAsJsonAsync("/api/auth/refresh", new { })).StatusCode);
     }
+    [Fact]
+    public async Task SaleOptions_TaxCommentsCategorySnapshots_AndSettings_ArePersisted()
+    {
+        using var factory = new ApiFactory(); using var client = factory.CreateReadyClient();
+        await RegisterAsync(factory, client, "invoice-options@example.com");
+        var warehouseId = (await client.GetFromJsonAsync<JsonElement>("/api/warehouses"))[0].GetProperty("id").GetGuid();
+        var customerId = (await PostAsync(client, "/api/customers", new { code = "TAX1", firstName = "Laura", creditLimit = 1000 })).GetProperty("id").GetGuid();
+        var categoryId = (await PostAsync(client, "/api/categories", new { name = "Servicios", parentCategoryId = (Guid?)null })).GetProperty("id").GetGuid();
+        var productId = (await PostAsync(client, "/api/products", new { sku = "TAX-SVC", name = "Instalación", cost = 20, salePrice = 100, taxRate = 18, trackInventory = false, categoryId })).GetProperty("id").GetGuid();
+
+        var paidByCustomer = await PostAsync(client, "/api/sales", new { customerId, warehouseId, sellerAssumesTax = false, includeCategoriesInReceipt = true, items = new[] { new { productId, quantity = 1, discount = 0, comment = "Instalar en horario matutino." } } });
+        Assert.Equal(18, paidByCustomer.GetProperty("tax").GetDecimal());
+        Assert.Equal(118, paidByCustomer.GetProperty("total").GetDecimal());
+        Assert.False(paidByCustomer.GetProperty("sellerAssumesTax").GetBoolean());
+        Assert.True(paidByCustomer.GetProperty("includeCategoriesInReceipt").GetBoolean());
+        var item = paidByCustomer.GetProperty("items")[0];
+        Assert.Equal("Instalar en horario matutino.", item.GetProperty("comment").GetString());
+        Assert.Equal("Servicios", item.GetProperty("categoryName").GetString());
+        var partialSale = await PostAsync(client, "/api/sales", new { customerId, warehouseId, items = new[] { new { productId, quantity = 1.5m, discount = 0, comment = "Servicio parcial" } } });
+        Assert.Equal(1.5m, partialSale.GetProperty("items")[0].GetProperty("quantity").GetDecimal());
+        Assert.Equal(177, partialSale.GetProperty("total").GetDecimal());
+
+        await client.PutAsJsonAsync($"/api/categories/{categoryId}", new { name = "Servicios profesionales", parentCategoryId = (Guid?)null });
+        var stored = await client.GetFromJsonAsync<JsonElement>($"/api/sales/{paidByCustomer.GetProperty("id").GetGuid()}");
+        Assert.Equal("Servicios", stored.GetProperty("items")[0].GetProperty("categoryName").GetString());
+
+        var assumedBySeller = await PostAsync(client, "/api/sales", new { customerId, warehouseId, sellerAssumesTax = true, includeCategoriesInReceipt = false, items = new[] { new { productId, quantity = 1, discount = 0, comment = "" } } });
+        Assert.Equal(18, assumedBySeller.GetProperty("tax").GetDecimal());
+        Assert.Equal(82, assumedBySeller.GetProperty("total").GetDecimal());
+        Assert.True(assumedBySeller.GetProperty("sellerAssumesTax").GetBoolean());
+        Assert.False(assumedBySeller.GetProperty("includeCategoriesInReceipt").GetBoolean());
+        var debts = await client.GetFromJsonAsync<JsonElement>("/api/accounts-receivable");
+        Assert.Contains(debts.GetProperty("items").EnumerateArray(), x => x.GetProperty("saleId").GetGuid() == assumedBySeller.GetProperty("id").GetGuid() && x.GetProperty("originalAmount").GetDecimal() == 82);
+
+        var settingsResponse = await client.PutAsJsonAsync("/api/settings", new { name = "Estok Pruebas", legalName = "Estok Pruebas SRL", taxId = "RNC-123", phone = "809-555-0101", email = "ventas@estok.test", address = "Calle Principal 1", invoiceAdditionalInfo = "Gracias por su compra.", currency = "DOP", country = "DO", timeZone = "America/Santo_Domingo", allowNegativeStock = false, defaultTaxRate = 18, quoteExpirationDays = 45, invoicePrefix = "FAC", quotePrefix = "COT" });
+        Assert.True(settingsResponse.IsSuccessStatusCode, await settingsResponse.Content.ReadAsStringAsync());
+        var settings = await client.GetFromJsonAsync<JsonElement>("/api/settings");
+        Assert.Equal("Estok Pruebas SRL", settings.GetProperty("business").GetProperty("legalName").GetString());
+        Assert.Equal("Gracias por su compra.", settings.GetProperty("settings").GetProperty("invoiceAdditionalInfo").GetString());
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/sales", new { customerId, warehouseId, items = new[] { new { productId, quantity = 1 }, new { productId, quantity = 1 } } })).StatusCode);
+        settingsResponse = await client.PutAsJsonAsync("/api/settings", new { name = "Estok Pruebas", legalName = "Estok Pruebas SRL", taxId = "RNC-123", phone = "809-555-0101", email = "ventas@estok.test", address = "Calle Principal 1", invoiceAdditionalInfo = "Gracias por su compra.", invoiceLogoScale = 1, allowDuplicateSaleItems = true, currency = "DOP", country = "DO", timeZone = "America/Santo_Domingo", allowNegativeStock = false, defaultTaxRate = 18, quoteExpirationDays = 45, invoicePrefix = "FAC", quotePrefix = "COT" });
+        Assert.True(settingsResponse.IsSuccessStatusCode, await settingsResponse.Content.ReadAsStringAsync());
+        var duplicateSale = await PostAsync(client, "/api/sales", new { customerId, warehouseId, items = new[] { new { productId, quantity = 1, comment = "Servicio A" }, new { productId, quantity = 1, comment = "Servicio B" } } });
+        Assert.Equal(2, duplicateSale.GetProperty("items").GetArrayLength());
+        Assert.Equal("Servicio A", duplicateSale.GetProperty("items")[0].GetProperty("comment").GetString());
+        Assert.Equal("Servicio B", duplicateSale.GetProperty("items")[1].GetProperty("comment").GetString());
+    }
+    [Fact]
+    public async Task Categories_UpdateDelete_RejectCycles_AndRespectTenants()
+    {
+        using var factory = new ApiFactory(); using var a = factory.CreateReadyClient(); using var b = factory.CreateReadyClient();
+        await RegisterAsync(factory, a, "categories-a@example.com"); await RegisterAsync(factory, b, "categories-b@example.com");
+        var parent = await PostAsync(a, "/api/categories", new { name = "Padre", parentCategoryId = (Guid?)null });
+        var parentId = parent.GetProperty("id").GetGuid();
+        var childId = (await PostAsync(a, "/api/categories", new { name = "Hija", parentCategoryId = parentId })).GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.BadRequest, (await a.PutAsJsonAsync($"/api/categories/{parentId}", new { name = "Padre", parentCategoryId = childId })).StatusCode);
+        var updated = await a.PutAsJsonAsync($"/api/categories/{childId}", new { name = "Hija editada", parentCategoryId = (Guid?)null });
+        Assert.True(updated.IsSuccessStatusCode, await updated.Content.ReadAsStringAsync());
+        Assert.Equal("Hija editada", (await updated.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("name").GetString());
+        Assert.Equal(HttpStatusCode.NotFound, (await b.PutAsJsonAsync($"/api/categories/{childId}", new { name = "Ajena", parentCategoryId = (Guid?)null })).StatusCode);
+        var productId = (await PostAsync(a, "/api/products", new { sku = "CAT-DEL", name = "Producto con categoría", cost = 1, salePrice = 2, categoryId = childId })).GetProperty("id").GetGuid();
+        Assert.Equal(HttpStatusCode.NoContent, (await a.DeleteAsync($"/api/categories/{childId}")).StatusCode);
+        var product = await a.GetFromJsonAsync<JsonElement>($"/api/products/{productId}");
+        Assert.Equal(JsonValueKind.Null, product.GetProperty("categoryId").ValueKind);
+        var categories = await a.GetFromJsonAsync<JsonElement>("/api/categories");
+        Assert.DoesNotContain(categories.EnumerateArray(), x => x.GetProperty("id").GetGuid() == childId);
+        Assert.Equal(HttpStatusCode.NotFound, (await b.DeleteAsync($"/api/categories/{parentId}")).StatusCode);
+    }
 }

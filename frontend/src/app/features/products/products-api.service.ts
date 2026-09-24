@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { PagedResult } from '../../core/models/session';
 export interface ProductRequest { categoryId?: string | null; sku: string; name: string; cost: number; salePrice: number; taxRate: number; minimumStock: number; barcode: string; description: string; trackInventory: boolean; }
-export interface Product extends ProductRequest { id: string; }
+export interface Product extends ProductRequest { id: string; categoryName?: string | null; }
 @Injectable({providedIn:'root'})
 export class ProductsApiService {
  private readonly http=inject(HttpClient); private readonly url=environment.apiBaseUrl+'/products';

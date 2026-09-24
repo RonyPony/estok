@@ -4,7 +4,7 @@ using eStok.Domain.Entities;
 using eStok.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 namespace eStok.Application.Features.Settings;
-public sealed record SettingsRequest(string Name, string Currency, string Country, string TimeZone, bool AllowNegativeStock, decimal DefaultTaxRate, int QuoteExpirationDays, string InvoicePrefix, string QuotePrefix);
+public sealed record SettingsRequest(string Name, string Currency, string Country, string TimeZone, bool AllowNegativeStock, decimal DefaultTaxRate, int QuoteExpirationDays, string InvoicePrefix, string QuotePrefix, string? LegalName = null, string? TaxId = null, string? Phone = null, string? Email = null, string? Address = null, string? InvoiceAdditionalInfo = null, decimal InvoiceLogoScale = 1, bool AllowDuplicateSaleItems = false);
 public sealed class SettingsService(IApplicationDbContext db, ICurrentBusiness business, IDocumentService documents)
 {
     public async Task<object> GetAsync(CancellationToken ct)
@@ -44,14 +44,24 @@ public sealed class SettingsService(IApplicationDbContext db, ICurrentBusiness b
 
         if (!System.Text.RegularExpressions.Regex.IsMatch(request.QuotePrefix, "^[A-Z0-9-]{1,10}$"))
             throw new AppException("INVALID_QUOTE_PREFIX", "El prefijo de cotización debe tener entre 1 y 10 caracteres y solo puede contener letras mayúsculas, números y guiones.");
+        if (new[] { request.LegalName, request.TaxId, request.Phone, request.Email, request.Address }.Any(x => x?.Length > 500) || request.InvoiceAdditionalInfo?.Length > 1000)
+            throw new AppException("INVALID_BUSINESS_INFO", "Revisa los datos de empresa y la información adicional de factura.");
+        if (request.InvoiceLogoScale is < 0.25m or > 2.5m)
+            throw new AppException("INVALID_LOGO_SCALE", "La escala del logo debe estar entre 0.25 y 2.50.");
         if (!TimeZoneInfo.TryFindSystemTimeZoneById(request.TimeZone, out _)) throw new AppException("INVALID_TIMEZONE", "Zona horaria inválida.");
         var b = await db.Businesses.SingleAsync(x => x.Id == business.BusinessId, ct);
         if (b.Currency != request.Currency && await db.Sales.AnyAsync(x => x.BusinessId == business.BusinessId, ct)) throw AppException.Conflict("No se puede cambiar la moneda cuando existen ventas.");
         b.Name = request.Name; b.Currency = request.Currency; b.Country = request.Country; b.TimeZone = request.TimeZone;
+        b.LegalName = Clean(request.LegalName); b.TaxId = Clean(request.TaxId); b.Phone = Clean(request.Phone); b.Email = Clean(request.Email); b.Address = Clean(request.Address);
         var settings = await db.Settings.SingleAsync(x => x.BusinessId == business.BusinessId, ct);
         settings.Currency = request.Currency; settings.AllowNegativeStock = request.AllowNegativeStock; settings.DefaultTaxRate = request.DefaultTaxRate; settings.QuoteExpirationDays = request.QuoteExpirationDays; settings.InvoicePrefix = request.InvoicePrefix; settings.QuotePrefix = request.QuotePrefix;
+        settings.InvoiceAdditionalInfo = CleanMultiline(request.InvoiceAdditionalInfo);
+        settings.InvoiceLogoScale = request.InvoiceLogoScale;
+        settings.AllowDuplicateSaleItems = request.AllowDuplicateSaleItems;
         foreach (var sequence in await db.Sequences.Where(x => x.BusinessId == business.BusinessId).ToListAsync(ct)) { if (sequence.DocumentType == DocumentType.Sale) sequence.Prefix = request.InvoicePrefix; if (sequence.DocumentType == DocumentType.Quote) sequence.Prefix = request.QuotePrefix; }
         return new { Business = b, Settings = settings };
     }, ct);
+    private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string? CleanMultiline(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
 }
 
