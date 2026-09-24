@@ -4,6 +4,7 @@ namespace eStok.Domain.Entities;
 
 public sealed class Sale : TenantEntity
 {
+    public bool PricesIncludeTax { get; set; }
     public Guid? CustomerId { get; set; }
     public Guid WarehouseId { get; set; }
     public string SaleNumber { get; set; } = "";
@@ -70,6 +71,7 @@ public sealed class AccountsReceivable : TenantEntity
 
 public sealed class Quote : TenantEntity
 {
+    public bool PricesIncludeTax { get; set; }
     public Guid CustomerId { get; set; }
     public string QuoteNumber { get; set; } = "";
     public DateTime IssueDate { get; set; }

@@ -5,6 +5,42 @@ using System.Text.Json;
 namespace eStok.IntegrationTests;
 public sealed class BusinessFlowTests
 {
+    [Theory]
+    [InlineData(false, 16.2, 106.2)]
+    [InlineData(true, 13.73, 90)]
+    public async Task TaxChoice_Persists_CashPayment_AndQuoteConversion(bool pricesIncludeTax, decimal tax, decimal total)
+    {
+        using var factory = new ApiFactory(); using var client = factory.CreateReadyClient();
+        await RegisterAsync(factory, client, "tax@example.com");
+        var warehouseId = (await client.GetFromJsonAsync<JsonElement>("/api/warehouses"))[0].GetProperty("id").GetGuid();
+        var methodId = (await client.GetFromJsonAsync<JsonElement>("/api/payment-methods")).EnumerateArray().First(x => x.GetProperty("type").GetString() == "Cash").GetProperty("id").GetGuid();
+        var productId = (await PostAsync(client, "/api/products", new { sku = "TAX", name = "Producto con impuesto", cost = 40, salePrice = 100, taxRate = 18, trackInventory = false })).GetProperty("id").GetGuid();
+        var items = new[] { new { productId, quantity = 1, discount = 10 } };
+        var sale = await PostAsync(client, "/api/sales", new { warehouseId, items, pricesIncludeTax, payments = new[] { new { paymentMethodId = methodId, amount = total } } });
+        var persisted = await client.GetFromJsonAsync<JsonElement>($"/api/sales/{sale.GetProperty("id").GetGuid()}");
+        Assert.Equal(pricesIncludeTax, persisted.GetProperty("pricesIncludeTax").GetBoolean());
+        Assert.Equal(tax, persisted.GetProperty("tax").GetDecimal());
+        Assert.Equal(total, persisted.GetProperty("total").GetDecimal());
+        Assert.Equal("Paid", persisted.GetProperty("paymentStatus").GetString());
+        Assert.Equal(0, persisted.GetProperty("balance").GetDecimal());
+        var dashboard = await client.GetFromJsonAsync<JsonElement>("/api/dashboard");
+        Assert.Equal(total - tax - 40, dashboard.GetProperty("estimatedProfit").GetDecimal());
+        var pdf = await client.GetByteArrayAsync($"/api/sales/{sale.GetProperty("id").GetGuid()}/pdf");
+        Assert.True(pdf.AsSpan().StartsWith("%PDF"u8));
+        var output = Environment.GetEnvironmentVariable("ESTOK_PDF_TEST_OUTPUT");
+        if (!string.IsNullOrEmpty(output)) { Directory.CreateDirectory(output); await File.WriteAllBytesAsync(Path.Combine(output, pricesIncludeTax ? "impuestos-incluidos.pdf" : "impuestos-adicionales.pdf"), pdf); }
+        var customerId = (await PostAsync(client, "/api/customers", new { code = "TAX", firstName = "Cliente" })).GetProperty("id").GetGuid();
+        var quote = await PostAsync(client, "/api/quotes", new { customerId, items, pricesIncludeTax });
+        // Conversion must preserve the quoted amounts even if the catalog changes.
+        var update = await client.PutAsJsonAsync($"/api/products/{productId}", new { sku = "TAX", name = "Nuevo nombre", cost = 50, salePrice = 200, taxRate = 25, trackInventory = false });
+        Assert.True(update.IsSuccessStatusCode, await update.Content.ReadAsStringAsync());
+        var converted = await PostAsync(client, $"/api/quotes/{quote.GetProperty("id").GetGuid()}/convert-to-sale", new { warehouseId });
+        Assert.Equal(pricesIncludeTax, converted.GetProperty("pricesIncludeTax").GetBoolean());
+        Assert.Equal(tax, converted.GetProperty("tax").GetDecimal());
+        Assert.Equal(total, converted.GetProperty("total").GetDecimal());
+        Assert.Equal(total, converted.GetProperty("balance").GetDecimal());
+        Assert.Equal(100, converted.GetProperty("items")[0].GetProperty("unitPrice").GetDecimal());
+    }
     [Fact]
     public async Task PersistentSession_RefreshesInNewClient_AndLogoutRevokesCookie()
     {

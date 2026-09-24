@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../../environments/environment';
 import { PagedResult } from '../../core/models/session';
 import { DocumentLine, DocumentRequest, Sale } from '../sales/sales-api.service';
-export interface Quote {notes:string|null;expirationDate:string;id:string;customerId:string;quoteNumber:string;status:string;total:number;subtotal:number;discount:number;tax:number;items:DocumentLine[];}
+export interface Quote {notes:string|null;expirationDate:string;id:string;customerId:string;quoteNumber:string;status:string;total:number;subtotal:number;pricesIncludeTax:boolean;discount:number;tax:number;items:DocumentLine[];}
 @Injectable({providedIn:'root'})
 export class QuotesApiService {
  private readonly http=inject(HttpClient);private readonly url=environment.apiBaseUrl+'/quotes';

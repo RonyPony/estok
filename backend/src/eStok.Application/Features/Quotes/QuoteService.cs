@@ -5,7 +5,7 @@ using eStok.Domain.Entities;
 using eStok.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 namespace eStok.Application.Features.Quotes;
-public sealed record QuoteRequest(Guid CustomerId, List<LineRequest> Items, string? Notes = null);
+public sealed record QuoteRequest(Guid CustomerId, List<LineRequest> Items, string? Notes = null, bool PricesIncludeTax = false);
 public sealed record UpdateQuoteRequest(QuoteStatus Status, string? Notes, DateTime ExpirationDate);
 public sealed class QuoteService(IApplicationDbContext db, ICurrentBusiness business, ICurrentUser user, IDateTimeProvider clock, IDocumentSequenceService sequences, SalesService sales, IDocumentService documents)
 {
@@ -28,15 +28,17 @@ public sealed class QuoteService(IApplicationDbContext db, ICurrentBusiness busi
         if (request.Items.Select(x => x.ProductId).Distinct().Count() != request.Items.Count) throw new AppException("DUPLICATE_PRODUCT", "El producto ya está en el presupuesto. Modifica su cantidad.");
         var days = await db.Settings.Where(x => x.BusinessId == business.BusinessId).Select(x => x.QuoteExpirationDays).SingleAsync(ct);
         var quote = new Quote { BusinessId = business.BusinessId, CustomerId = request.CustomerId, QuoteNumber = await sequences.NextAsync(DocumentType.Quote, ct), IssueDate = clock.UtcNow, ExpirationDate = clock.UtcNow.AddDays(days), Status = QuoteStatus.Draft, CreatedBy = user.UserId, Notes = request.Notes };
+        quote.PricesIncludeTax = request.PricesIncludeTax;
         foreach (var line in request.Items)
         {
             var product = await db.Products.SingleOrDefaultAsync(x => x.Id == line.ProductId && x.BusinessId == business.BusinessId && x.IsActive, ct) ?? throw AppException.NotFound();
             SalesService.ValidateLine(line, product.SalePrice);
-            var subtotal = SalesService.Money(product.SalePrice * line.Quantity); var tax = SalesService.Money((subtotal - line.Discount) * product.TaxRate / 100);
-            quote.Items.Add(new QuoteItem { BusinessId = business.BusinessId, QuoteId = quote.Id, ProductId = product.Id, Description = product.Name, Quantity = line.Quantity, UnitPrice = product.SalePrice, Discount = line.Discount, Tax = tax, Total = subtotal - line.Discount + tax });
+            var subtotal = SalesService.Money(product.SalePrice * line.Quantity);
+            var tax = SalesService.CalculateTax(subtotal - line.Discount, product.TaxRate, quote.PricesIncludeTax);
+            quote.Items.Add(new QuoteItem { BusinessId = business.BusinessId, QuoteId = quote.Id, ProductId = product.Id, Description = product.Name, Quantity = line.Quantity, UnitPrice = product.SalePrice, Discount = line.Discount, Tax = tax, Total = subtotal - line.Discount + (quote.PricesIncludeTax ? 0 : tax) });
             quote.Subtotal += subtotal; quote.Discount += line.Discount; quote.Tax += tax;
         }
-        quote.Total = quote.Subtotal - quote.Discount + quote.Tax; db.Quotes.Add(quote); await documents.StoreAsync(quote, ct); return quote;
+        quote.Total = quote.Items.Sum(x => x.Total); db.Quotes.Add(quote); await documents.StoreAsync(quote, ct); return quote;
     }, ct);
     public Task<Sale> ConvertAsync(Guid id, Guid warehouseId, CancellationToken ct) => db.InTransactionAsync(async () =>
     {

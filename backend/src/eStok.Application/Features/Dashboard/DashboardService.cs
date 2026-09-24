@@ -16,7 +16,7 @@ public sealed class DashboardService(IApplicationDbContext db, ICurrentBusiness 
         return new {
             SalesToday = await sales.Where(x => x.SaleDate >= today).SumAsync(x => x.Total, ct),
             SalesThisMonth = await sales.Where(x => x.SaleDate >= month).SumAsync(x => x.Total, ct),
-            EstimatedProfit = await sales.Where(x => x.SaleDate >= month).SelectMany(x => x.Items).SumAsync(x => x.Subtotal - x.Discount - x.UnitCost * x.Quantity, ct),
+            EstimatedProfit = await sales.Where(x => x.SaleDate >= month).SelectMany(x => x.Items).SumAsync(x => x.Total - x.Tax - x.UnitCost * x.Quantity, ct),
             AccountsReceivable = await db.Receivables.Where(x => x.BusinessId == business.BusinessId && x.Status != ReceivableStatus.Cancelled).SumAsync(x => x.Balance, ct),
             Customers = await db.Customers.CountAsync(x => x.BusinessId == business.BusinessId, ct),
             Products = await db.Products.CountAsync(x => x.BusinessId == business.BusinessId, ct),

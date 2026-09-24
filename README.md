@@ -54,6 +54,47 @@ Esta configuración es para desarrollo local. Para publicar, configura HTTPS, pr
 
 ## Desarrollo local
 
+### Windows con SQL Server LocalDB
+
+La configuración `Development` usa `(localdb)\MSSQLLocalDB`, base `estok`,
+con autenticación de Windows. No necesita la instancia remota configurada para
+producción. Con .NET 10, SQL Server LocalDB y Node 24 instalados:
+
+```powershell
+SqlLocalDB start MSSQLLocalDB
+cd backend
+dotnet tool restore
+dotnet restore
+dotnet run --project src/eStok.Api -- --migrate
+dotnet run --project src/eStok.Api
+```
+
+En otra terminal, desde `frontend`, ejecuta `npm ci` y `npm start`.
+El frontend abre en http://localhost:4200 y usa `/api` mediante el proxy al
+puerto 5080. El backoffice se instala por separado con `npm ci` desde
+`backoffice` y se inicia con `npm start -- --port 4300`.
+Si acabas de instalar Node, abre una terminal nueva para actualizar el PATH;
+en PowerShell también puedes usar `npm.cmd`.
+
+Las migraciones crean el esquema, no restauran datos ni crean cuentas de
+demostración. Los registros nuevos siguen el flujo de activación del proyecto.
+
+### Impuestos en ventas y presupuestos
+
+Al crear cada documento, el usuario puede sumar el impuesto al precio o
+asumirlo dentro del precio. La segunda opción calcula el impuesto por línea
+como `(importe - descuento) * tasa / (100 + tasa)`, redondeado a dos decimales,
+y no lo vuelve a sumar al total. Por ejemplo, 100 con 18% incluido se cobra
+a 100 y desglosa 15,25 de impuesto. La ganancia excluye ese impuesto.
+
+`PricesIncludeTax` se conserva en el documento y al convertir un presupuesto
+en venta. El subtotal y el descuento conservan la base del precio introducido;
+el resumen y el PDF identifican expresamente cuándo incluyen impuestos.
+Los documentos existentes y las solicitudes sin esta opción mantienen el
+impuesto adicional. Aplica `DocumentPricesIncludeTax` antes de arrancar la API.
+
+### Opción con Docker para la base de datos
+
 Requisitos: .NET SDK 10 y Node LTS 24 (compatible con Angular 22). Las versiones exactas de npm están en `package-lock.json`.
 
 ```sh

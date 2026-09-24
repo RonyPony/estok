@@ -24,9 +24,9 @@ public sealed class DocumentService(IApplicationDbContext db, ICurrentBusiness b
     private record Line(string Description, decimal Quantity, decimal Price, decimal Discount, decimal Tax, decimal Total, string? Comment = null, string? CategoryName = null);
 
     public Task StoreAsync(Sale sale, CancellationToken ct) => StoreCoreAsync(sale.Id, DocumentType.Sale, sale.SaleNumber, sale.CustomerId, sale.SaleDate, null, sale.Notes,
-        sale.Items.Select(x => new Line(x.Description, x.Quantity, x.UnitPrice, x.Discount, x.Tax, x.Total, x.Comment, sale.IncludeCategoriesInReceipt ? x.CategoryName : null)), sale.Subtotal, sale.Discount, sale.Tax, sale.Total, sale.SellerAssumesTax, ct);
+        sale.Items.Select(x => new Line(x.Description, x.Quantity, x.UnitPrice, x.Discount, x.Tax, x.Total, x.Comment, sale.IncludeCategoriesInReceipt ? x.CategoryName : null)), sale.Subtotal, sale.Discount, sale.Tax, sale.Total, sale.PricesIncludeTax, sale.SellerAssumesTax, ct);
     public Task StoreAsync(Quote quote, CancellationToken ct) => StoreCoreAsync(quote.Id, DocumentType.Quote, quote.QuoteNumber, quote.CustomerId, quote.IssueDate, quote.ExpirationDate, quote.Notes,
-        quote.Items.Select(x => new Line(x.Description, x.Quantity, x.UnitPrice, x.Discount, x.Tax, x.Total)), quote.Subtotal, quote.Discount, quote.Tax, quote.Total, false, ct);
+        quote.Items.Select(x => new Line(x.Description, x.Quantity, x.UnitPrice, x.Discount, x.Tax, x.Total)), quote.Subtotal, quote.Discount, quote.Tax, quote.Total, quote.PricesIncludeTax, false, ct);
 
     public Task<BusinessDocument> GetAsync(Guid id, DocumentType type, CancellationToken ct) => db.InTransactionAsync(async () =>
     {
@@ -55,7 +55,7 @@ public sealed class DocumentService(IApplicationDbContext db, ICurrentBusiness b
     }
 
     private async Task StoreCoreAsync(Guid id, DocumentType type, string number, Guid? customerId, DateTime date, DateTime? expiration, string? notes,
-        IEnumerable<Line> lines, decimal subtotal, decimal discount, decimal tax, decimal total, bool sellerAssumesTax, CancellationToken ct)
+        IEnumerable<Line> lines, decimal subtotal, decimal discount, decimal tax, decimal total, bool pricesIncludeTax, bool sellerAssumesTax, CancellationToken ct)
     {
         var company = await db.Businesses.SingleAsync(x => x.Id == business.BusinessId, ct);
         var settings = await db.Settings.SingleAsync(x => x.BusinessId == business.BusinessId, ct);
@@ -91,6 +91,7 @@ public sealed class DocumentService(IApplicationDbContext db, ICurrentBusiness b
         section.AddParagraph("Cliente: " + (customer is null ? "Consumidor final · Contado" : customer.BusinessName ?? $"{customer.FirstName} {customer.LastName}".Trim()));
         if (!string.IsNullOrWhiteSpace(customer?.DocumentNumber)) section.AddParagraph("Documento: " + customer.DocumentNumber);
         section.AddParagraph("Moneda: " + company.Currency);
+        if (pricesIncludeTax) section.AddParagraph("Los precios incluyen impuestos. El impuesto desglosado no se suma al total.");
         var table = section.AddTable();
         table.Borders.Color = Color.Parse("#DFE5EF"); table.Borders.Width = .5;
         table.TopPadding = table.BottomPadding = 6;
@@ -110,13 +111,13 @@ public sealed class DocumentService(IApplicationDbContext db, ICurrentBusiness b
             for (var i = 0; i < values.Length; i++) { row.Cells[i + 1].AddParagraph(values[i]); row.Cells[i + 1].Format.Alignment = ParagraphAlignment.Right; }
         }
         section.AddParagraph();
-        foreach (var item in new[] { ("Subtotal", subtotal), ("Descuento", discount), ("Impuestos", tax), ("TOTAL", total) })
+        foreach (var item in new[] { (pricesIncludeTax ? "Subtotal (con impuestos)" : "Subtotal", subtotal), ("Descuento", discount), (pricesIncludeTax ? "Impuestos incluidos" : "Impuestos", tax), ("TOTAL", total) })
         {
             var p = section.AddParagraph($"{item.Item1}: {company.Currency} {Money(item.Item2)}"); p.Format.Alignment = ParagraphAlignment.Right;
             p.Format.KeepWithNext = item.Item1 != "TOTAL";
             if (item.Item1 == "TOTAL") { p.Format.Font.Bold = true; p.Format.Font.Size = 15; p.Format.Font.Color = Color.Parse("#3659D9"); }
         }
-        if (sellerAssumesTax) section.AddParagraph("El impuesto fue asumido por el negocio y se descontó del total cobrado.");
+        //if (sellerAssumesTax) section.AddParagraph("El impuesto fue asumido por el negocio y se descontó del total cobrado.");
         if (!string.IsNullOrWhiteSpace(notes)) section.AddParagraph("Notas: " + notes);
         if (!string.IsNullOrWhiteSpace(settings.InvoiceAdditionalInfo))
         {
