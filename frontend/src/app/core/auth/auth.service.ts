@@ -10,6 +10,9 @@ export class AuthService {
   private readonly state = inject(AuthStateService);
   private readonly router = inject(Router);
   private refreshing?: Observable<Session>;
+  restore(): Observable<Session | null> {
+    return this.api.restore().pipe(tap(session => this.state.session.set(session)));
+  }
   refresh(): Observable<Session> {
     return this.refreshing ??= this.api.refresh().pipe(tap(s => this.state.session.set(s)), catchError(error => { this.state.session.set(null); return throwError(() => error); }), finalize(() => this.refreshing = undefined), shareReplay({ bufferSize: 1, refCount: false }));
   }

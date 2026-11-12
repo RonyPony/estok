@@ -30,6 +30,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
     public DbSet<InventoryMovement> Movements => Set<InventoryMovement>();
     public DbSet<Sale> Sales => Set<Sale>();
     public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<PaymentRefund> PaymentRefunds => Set<PaymentRefund>();
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
     public DbSet<AccountsReceivable> Receivables => Set<AccountsReceivable>();
     public DbSet<Quote> Quotes => Set<Quote>();
@@ -82,7 +83,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ICurren
                 if (!IsInitializing && (!business.HasBusiness || tenant.BusinessId != TenantId ||
                     (entry.State != EntityState.Added && entry.Property(nameof(TenantEntity.BusinessId)).OriginalValue is Guid original && original != TenantId)))
                     throw new AppException("TENANT_ACCESS_DENIED", "Acceso denegado.", 403);
-                if (entry.State != EntityState.Added && entry.Entity is InventoryMovement or Payment or AuditLog)
+                if (entry.State != EntityState.Added && entry.Entity is InventoryMovement or Payment or PaymentRefund or AuditLog)
                     throw AppException.Conflict("El registro histórico es inmutable.");
                 if (entry.State == EntityState.Deleted)
                 {

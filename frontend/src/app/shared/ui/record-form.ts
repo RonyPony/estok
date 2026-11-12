@@ -5,15 +5,18 @@ import { MatInputModule } from '@angular/material/input';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-export interface FormField { key: string; label: string; type?: 'text' | 'number' | 'email' | 'password' | 'checkbox' | 'textarea'; }
+import { CountrySelectorComponent } from './country-selector';
+export interface FormField { key: string; label: string; type?: 'text' | 'number' | 'email' | 'password' | 'checkbox' | 'textarea' | 'country'; }
 @Component({
   selector: 'app-record-form',
-  imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatCheckboxModule, MatButtonModule, MatIconModule],
+  imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatCheckboxModule, MatButtonModule, MatIconModule, CountrySelectorComponent],
   template: `
     <div class="form-grid" [formGroup]="form()">
       @for (field of fields(); track field.key) {
         @if (field.type === 'checkbox') {
           <mat-checkbox [formControlName]="field.key">{{ field.label }}</mat-checkbox>
+        } @else if (field.type === 'country') {
+          <app-country-selector [formControlName]="field.key" />
         } @else {
           <mat-form-field appearance="outline">
             <mat-label>{{ field.label }}</mat-label>

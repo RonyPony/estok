@@ -39,11 +39,12 @@ public sealed class SalesService(IApplicationDbContext db, ICurrentBusiness busi
             ValidateLine(line, price);
             var subtotal = Money(line.Quantity * price);
             var tax = snapshot?.Tax ?? CalculateTax(subtotal - line.Discount, product.TaxRate, sale.PricesIncludeTax);
-            var total = snapshot?.Total ?? subtotal - line.Discount + (sale.PricesIncludeTax ? 0 : tax);
+            var total = CalculateTotal(subtotal, line.Discount, tax, sale.PricesIncludeTax, sale.SellerAssumesTax);
+            if (total < 0) throw new AppException("INVALID_TOTAL", "El total de un producto no puede ser negativo. Revisa su impuesto y descuento.");
             sale.Items.Add(new SaleItem { BusinessId = business.BusinessId, SaleId = sale.Id, ProductId = product.Id, Description = snapshot?.Description ?? product.Name, Quantity = line.Quantity, UnitPrice = price, UnitCost = product.Cost, Discount = line.Discount, Subtotal = subtotal, Tax = tax, Total = total, Comment = string.IsNullOrWhiteSpace(line.Comment) ? null : line.Comment.Trim(), CategoryName = categoryName });
             if (product.TrackInventory) await inventory.DecreaseStockAsync(product.Id, request.WarehouseId, line.Quantity, InventoryMovementType.Sale, sale.Id, ct);
         }
-        sale.Subtotal = sale.Items.Sum(x => x.Subtotal); sale.Discount = sale.Items.Sum(x => x.Discount); sale.Tax = sale.Items.Sum(x => x.Tax); sale.Total = sale.Items.Sum(x => x.Total) - (sale.SellerAssumesTax ? (sale.PricesIncludeTax ? sale.Tax : sale.Tax * 2) : 0); sale.Balance = sale.Total;
+        sale.Subtotal = sale.Items.Sum(x => x.Subtotal); sale.Discount = sale.Items.Sum(x => x.Discount); sale.Tax = sale.Items.Sum(x => x.Tax); sale.Total = sale.Items.Sum(x => x.Total); sale.Balance = sale.Total;
         sale.PaymentStatus = sale.Total == 0 ? PaymentStatus.Paid : PaymentStatus.Pending;
         if (customer?.CreditLimit.HasValue == true)
         {
@@ -66,7 +67,9 @@ public sealed class SalesService(IApplicationDbContext db, ICurrentBusiness busi
     {
         var sale = await GetAsync(id, ct);
         if (sale.Status == SaleStatus.Cancelled) return sale;
-        if (sale.PaidAmount > 0) throw AppException.Conflict("La venta tiene pagos. Deben reembolsarse antes de cancelarla.");
+        var received = await db.Payments.Where(x => x.SaleId == id && x.BusinessId == business.BusinessId).SumAsync(x => x.Amount, ct);
+        var refunded = await db.PaymentRefunds.Where(x => x.SaleId == id && x.BusinessId == business.BusinessId).SumAsync(x => x.Amount, ct);
+        if (sale.PaidAmount > 0 || received != refunded) throw AppException.Conflict("La venta tiene pagos. Deben reembolsarse antes de cancelarla.");
         var movements = await db.Movements.Where(x => x.BusinessId == business.BusinessId && x.ReferenceId == id && x.MovementType == InventoryMovementType.Sale).ToListAsync(ct);
         foreach (var movement in movements) await inventory.IncreaseStockAsync(movement.ProductId, movement.WarehouseId, -movement.Quantity, InventoryMovementType.Return, id, ct);
         sale.Status = SaleStatus.Cancelled; sale.PaymentStatus = PaymentStatus.Cancelled; sale.Balance = 0;
@@ -75,6 +78,8 @@ public sealed class SalesService(IApplicationDbContext db, ICurrentBusiness busi
         return sale;
     }, ct);
     public static decimal Money(decimal value) => decimal.Round(value, 2, MidpointRounding.AwayFromZero);
+    public static decimal CalculateTotal(decimal subtotal, decimal discount, decimal tax, bool pricesIncludeTax, bool sellerAssumesTax) =>
+        Money(subtotal - discount + (sellerAssumesTax ? -tax : pricesIncludeTax ? 0 : tax));
     // Subtotal and discount retain the entered price basis. Included tax is
     // disclosed separately, never added to the customer's total a second time.
     public static decimal CalculateTax(decimal amount, decimal rate, bool pricesIncludeTax) =>

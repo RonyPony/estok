@@ -59,6 +59,17 @@ public sealed class Payment : TenantEntity
     public Guid CreatedBy { get; set; }
 }
 
+public sealed class PaymentRefund : TenantEntity
+{
+    public Guid PaymentId { get; set; }
+    public Guid SaleId { get; set; }
+    public decimal Amount { get; set; }
+    public DateTime RefundDate { get; set; }
+    public string Reference { get; set; } = "";
+    public string Reason { get; set; } = "";
+    public Guid CreatedBy { get; set; }
+}
+
 public sealed class AccountsReceivable : TenantEntity
 {
     public Guid CustomerId { get; set; }

@@ -10,8 +10,12 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 namespace eStok.Api.Controllers;
 [ApiController, Route("api/sales")]
-public sealed class SalesController(SalesService service, IAuthorizationService authorization, IDocumentService documents) : ControllerBase
+public sealed class SalesController(SalesService service, IAuthorizationService authorization, IDocumentService documents, PaymentService payments) : ControllerBase
 {
+    [HttpGet("{id:guid}/payments"), RequirePermission("payments.view")]
+    public async Task<IActionResult> Payments(Guid id, CancellationToken ct) => Ok(await payments.HistoryAsync(id, ct));
+    [HttpPost("{id:guid}/refund"), RequirePermission("sales.cancel"), RequirePermission("payments.create")]
+    public async Task<IActionResult> Refund(Guid id, RefundSaleRequest request, CancellationToken ct) => Ok(await payments.RefundSaleAsync(id, request, ct));
     [HttpGet("{id:guid}/pdf"), RequirePermission("sales.view")]
     public async Task<IActionResult> Pdf(Guid id, CancellationToken ct) { var file = await documents.GetAsync(id, eStok.Domain.Enums.DocumentType.Sale, ct); Response.Headers.CacheControl = "no-store"; return File(file.Content, "application/pdf", file.FileName); }
     [HttpGet, RequirePermission("sales.view")] public async Task<IActionResult> List([FromQuery] PagedRequest request, CancellationToken ct) => Ok(await service.ListAsync(request, ct));
@@ -38,6 +42,8 @@ public sealed record ConvertRequest(Guid WarehouseId);
 [ApiController, Route("api/payments")]
 public sealed class PaymentsController(PaymentService service) : ControllerBase
 {
+    [HttpGet("refunds"), RequirePermission("payments.view")]
+    public async Task<IActionResult> Refunds([FromQuery] PagedRequest request, CancellationToken ct) => Ok(await service.RefundsAsync(request, ct));
     [HttpPost, RequirePermission("payments.create")] public async Task<IActionResult> Create(PaymentRequest request, CancellationToken ct) => Ok(await service.CreateAsync(request, ct));
 }
 [ApiController, Route("api/settings")]

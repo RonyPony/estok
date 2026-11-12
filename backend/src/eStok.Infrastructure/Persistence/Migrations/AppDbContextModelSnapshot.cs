@@ -712,8 +712,6 @@ namespace eStok.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("BusinessId", "Id");
-
                     b.HasIndex("BusinessId", "CustomerId");
 
                     b.HasIndex("BusinessId", "PaymentMethodId");
@@ -752,6 +750,57 @@ namespace eStok.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("PaymentMethods");
+                });
+
+            modelBuilder.Entity("eStok.Domain.Entities.PaymentRefund", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("BusinessId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("CreatedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("PaymentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime>("RefundDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BusinessId", "PaymentId")
+                        .IsUnique();
+
+                    b.HasIndex("BusinessId", "SaleId");
+
+                    b.ToTable("PaymentRefunds");
                 });
 
             modelBuilder.Entity("eStok.Domain.Entities.Permission", b =>
@@ -1736,6 +1785,23 @@ namespace eStok.Infrastructure.Persistence.Migrations
                     b.HasOne("eStok.Domain.Entities.Business", null)
                         .WithMany()
                         .HasForeignKey("BusinessId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("eStok.Domain.Entities.PaymentRefund", b =>
+                {
+                    b.HasOne("eStok.Domain.Entities.Payment", null)
+                        .WithMany()
+                        .HasForeignKey("BusinessId", "PaymentId")
+                        .HasPrincipalKey("BusinessId", "Id")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("eStok.Domain.Entities.Sale", null)
+                        .WithMany()
+                        .HasForeignKey("BusinessId", "SaleId")
+                        .HasPrincipalKey("BusinessId", "Id")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });

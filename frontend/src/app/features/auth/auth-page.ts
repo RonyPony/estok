@@ -8,6 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { finalize } from 'rxjs';
+import { CountrySelectorComponent } from '../../shared/ui/country-selector';
 import { AuthApiService } from '../../core/auth/auth-api.service';
 import { AuthStateService } from '../../core/auth/auth-state.service';
 @Component({
@@ -20,6 +21,7 @@ import { AuthStateService } from '../../core/auth/auth-state.service';
     MatButtonModule,
     MatCheckboxModule,
     MatIconModule,
+    CountrySelectorComponent,
   ],
   templateUrl: './auth-page.html',
 })
@@ -43,6 +45,7 @@ export class AuthPageComponent {
   });
   constructor() {
     if (this.register) {
+      this.form.controls.country.addValidators(Validators.required);
       for (const field of ['firstName', 'lastName', 'businessName'] as const)
         this.form.controls[field].addValidators(Validators.required);
       this.form.controls.password.addValidators([Validators.minLength(10), Validators.maxLength(128)]);

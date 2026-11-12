@@ -8,6 +8,7 @@ export interface PaymentMethod {id:string;name:string;type:string;}
 export class PaymentsApiService {
  private readonly http=inject(HttpClient);
  list(pageNumber=1){return this.http.get<PagedResult<TableRow>>(environment.apiBaseUrl+'/payments',{params:{pageNumber,pageSize:20}});}
+ refunds(pageNumber=1){return this.http.get<PagedResult<TableRow>>(environment.apiBaseUrl+'/payments/refunds',{params:{pageNumber,pageSize:20}});}
  methods(){return this.http.get<PaymentMethod[]>(environment.apiBaseUrl+'/payment-methods');}
  create(request:{saleId:string;paymentMethodId:string;amount:number;reference:string}){return this.http.post(environment.apiBaseUrl+'/payments',request);}
 }

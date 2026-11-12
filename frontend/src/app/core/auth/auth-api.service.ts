@@ -15,6 +15,13 @@ export class AuthApiService {
       withCredentials: true,
     });
   }
+  restore() {
+    return this.http.post<Session | null>(
+      `${environment.apiBaseUrl}/auth/restore`,
+      {},
+      { withCredentials: true },
+    );
+  }
   refresh() {
     return this.http.post<Session>(
       `${environment.apiBaseUrl}/auth/refresh`,

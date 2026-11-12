@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using eStok.Application.Common;
 namespace eStok.Api.Controllers;
 
 [ApiController, Route("api/auth"), EnableRateLimiting("auth")]
@@ -15,6 +16,21 @@ public sealed class AuthController(IAuthService auth, IValidator<RegisterRequest
     {
         ValidateOrigin();
         return Session(await auth.LoginAsync(request, ct));
+    }
+
+    [HttpPost("restore")]
+    public async Task<IActionResult> Restore(CancellationToken ct)
+    {
+        ValidateOrigin();
+        Response.Headers.CacheControl = "no-store";
+        var token = Request.Cookies["refresh_token"];
+        if (string.IsNullOrWhiteSpace(token)) return NoContent();
+        try { return Session(await auth.RefreshAsync(token, ct)); }
+        catch (AppException error) when (error.Status == StatusCodes.Status401Unauthorized)
+        {
+            Response.Cookies.Delete("refresh_token", CookieOptions());
+            return NoContent();
+        }
     }
 
     [HttpPost("refresh")]

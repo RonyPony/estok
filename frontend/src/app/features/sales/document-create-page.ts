@@ -1,3 +1,4 @@
+import { documentTotals } from './document-totals';
 import { PaymentSectionComponent } from './payment-section';
 import { HasPermission } from '../../shared/directives/has-permission';
 import { Component, computed, inject, signal } from '@angular/core';
@@ -51,10 +52,10 @@ import { SaleTotalsComponent } from './sale-totals';
    <mat-form-field appearance="outline"><mat-label>Impuestos</mat-label>
      <mat-select formControlName="pricesIncludeTax">
        <mat-option [value]="false">Sumar el impuesto al precio</mat-option>
-       <mat-option [value]="true">Asumir el impuesto · incluido en el precio</mat-option>
+       <mat-option [value]="true">El precio ya incluye el impuesto</mat-option>
      </mat-select>
    </mat-form-field>
-   @if(pricesIncludeTax()){<p class="field-help">El cliente paga el precio indicado menos el descuento. El impuesto se desglosa dentro de ese importe.</p>}
+   @if(pricesIncludeTax()){<p class="field-help">El impuesto se desglosa dentro del precio. Si eliges asumirlo, también se descuenta del total cobrado.</p>}
    <app-product-selector [excludedIds]="productIds()" (selected)="selectProduct($event)" />
    @if(pendingProduct();as product){
      <div class="product-entry">
@@ -66,7 +67,7 @@ import { SaleTotalsComponent } from './sale-totals';
    @if(!quote){<mat-checkbox formControlName="includeCategoriesInReceipt">Mostrar categorías en el recibo</mat-checkbox>}
    @if(lines().length){<app-sale-items [items]="lineControls()" (remove)="removeLine($event)" />}
    @else{<div class="empty">Busca tu primer producto para comenzar.</div>}
-   <p class="field-help">Cada producto ocupa una sola línea. Puedes modificar su cantidad en la tabla.</p>
+   <p class="field-help">Puedes modificar la cantidad, el descuento y el comentario de cada línea en la tabla.</p>
    <app-sale-totals [subtotal]="subtotal()" [discount]="discount()" [tax]="tax()" [total]="total()" [sellerAssumesTax]="sellerAssumesTax()" [pricesIncludeTax]="pricesIncludeTax()" />
    @if(!quote){
      <div class="section-divider"></div><span class="eyebrow">03 · PAGO</span>
@@ -104,7 +105,6 @@ export class DocumentCreatePageComponent {
    if(this.quote)this.form.controls.customerId.addValidators(Validators.required);
    else {this.form.controls.warehouseId.addValidators(Validators.required);this.inventory.warehouses().subscribe(w=>{this.warehouses.set(w);this.form.controls.warehouseId.setValue(w[0]?.id??'');});}
    if(!this.quote)this.settings.get().subscribe(r=>this.allowDuplicateSaleItems.set(r.settings.allowDuplicateSaleItems??false));
-   this.form.controls.items.valueChanges.pipe(takeUntilDestroyed()).subscribe(()=>this.form.controls.items.updateValueAndValidity({emitEvent:false}));
    this.form.controls.sellerAssumesTax.valueChanges.pipe(takeUntilDestroyed()).subscribe(value=>this.sellerAssumesTax.set(this.boolValue(value)));
  }
  setCashOnly(value:boolean){this.cashOnly.set(value);const customer=this.form.controls.customerId;customer.setValue('');customer.setValidators(value?[]:[Validators.required]);customer.updateValueAndValidity();}
@@ -116,16 +116,18 @@ export class DocumentCreatePageComponent {
    this.pendingProduct.set(null);this.error.set('');
  }
  removeLine(index:number){this.form.controls.items.removeAt(index);}
- subtotal(){return money(this.lines().reduce((s,x)=>s+money(x.quantity*x.price),0));}
- discount(){return money(this.lines().reduce((s,x)=>s+x.discount,0));}
- tax(){return money(this.lines().reduce((s,x)=>s+money((money(x.quantity*x.price)-x.discount)*x.taxRate/(this.pricesIncludeTax()?100+x.taxRate:100)),0));}
- total(){return money(this.subtotal()-this.discount()+(this.pricesIncludeTax()?0:this.tax())-(this.sellerAssumesTax()?(this.pricesIncludeTax()?this.tax():this.tax()*2):0));}
+ readonly totals=computed(()=>documentTotals(this.lines(),this.pricesIncludeTax(),this.sellerAssumesTax()));
+ subtotal(){return this.totals().subtotal;}
+ discount(){return this.totals().discount;}
+ tax(){return this.totals().tax;}
+ total(){return this.totals().total;}
  payTotal(){this.paymentForm.controls.amount.setValue(this.total());}
  save(){
    if(this.saving())return;
    this.form.markAllAsTouched();this.paymentForm.markAllAsTouched();
    if(this.form.invalid||!this.form.controls.items.length){this.error.set('Revisa los datos requeridos y agrega al menos un producto.');return;}
    if(this.pendingProduct()){this.error.set('Agrega el producto seleccionado antes de continuar.');return;}
+   if(!Number.isFinite(this.total())||this.total()<0){this.error.set('Revisa las cantidades, los impuestos y los descuentos. El total no puede ser negativo.');return;}
    const payment=this.paymentForm.getRawValue();
    if(!this.quote&&(this.paymentForm.invalid||(payment.amount>0&&!payment.paymentMethodId))){this.error.set('Revisa el monto y el método de pago.');return;}
    if(!this.quote&&this.cashOnly()&&payment.amount!==this.total()){this.error.set('La venta sin cliente requiere el pago completo. Usa el total de la venta.');return;}
@@ -137,5 +139,3 @@ export class DocumentCreatePageComponent {
  }
  private boolValue(value:unknown){return value===true||value==='true';}
 }
-
-function money(value:number){return Math.round((value+Number.EPSILON*Math.max(1,Math.abs(value)))*100)/100;}

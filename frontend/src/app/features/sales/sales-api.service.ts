@@ -4,6 +4,7 @@ import { environment } from '../../../environments/environment';
 import { PagedResult } from '../../core/models/session';
 
 export interface DocumentLine { id:string;productId:string;description:string;quantity:number;unitPrice:number;discount:number;tax:number;total:number;comment?:string|null;categoryName?:string|null; }
+export interface SalePaymentHistory {payments:{id:string;amount:number;paymentDate:string;paymentMethodId:string;reference?:string}[];refunds:{id:string;paymentId:string;amount:number;refundDate:string;reference:string;reason:string;createdBy:string}[];}
 export interface Sale {id:string;customerId:string|null;warehouseId:string;saleNumber:string;status:string;total:number;subtotal:number;pricesIncludeTax:boolean;discount:number;tax:number;balance:number;paidAmount:number;paymentStatus:string;sellerAssumesTax:boolean;includeCategoriesInReceipt:boolean;items:DocumentLine[];}
 export interface DocumentRequest {customerId:string|null;warehouseId:string;notes:string;items:{productId:string;quantity:number;discount:number;comment?:string|null}[];sellerAssumesTax?:boolean;includeCategoriesInReceipt?:boolean;pricesIncludeTax?:boolean;}
 @Injectable({providedIn:'root'})
@@ -14,4 +15,6 @@ export class SalesApiService {
  get(id:string){return this.http.get<Sale>(this.url+'/'+id);}
  create(request:DocumentRequest){return this.http.post<Sale>(this.url,request);}
  cancel(id:string){return this.http.post<Sale>(this.url+'/'+id+'/cancel',{});}
+ history(id:string){return this.http.get<SalePaymentHistory>(this.url+'/'+id+'/payments');}
+ refund(id:string,request:{reference:string;reason:string}){return this.http.post<SalePaymentHistory>(this.url+'/'+id+'/refund',request);}
 }

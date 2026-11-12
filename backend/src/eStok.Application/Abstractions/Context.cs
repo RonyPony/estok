@@ -22,6 +22,7 @@ public interface IApplicationDbContext
     DbSet<InventoryMovement> Movements { get; }
     DbSet<Sale> Sales { get; }
     DbSet<Payment> Payments { get; }
+    DbSet<PaymentRefund> PaymentRefunds { get; }
     DbSet<PaymentMethod> PaymentMethods { get; }
     DbSet<AccountsReceivable> Receivables { get; }
     DbSet<Quote> Quotes { get; }
